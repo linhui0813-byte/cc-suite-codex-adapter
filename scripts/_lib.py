@@ -103,5 +103,4 @@ def extract_archive(archive: Path, tag: str, destination: Path) -> Path:
 
 
 def adapter_version(tag: str, revision: int) -> str:
-    return f"{tag.removeprefix('v')}+adapter.{revision}"
-
+    return f"{tag.removeprefix('v')}+codex.adapter-{revision}"

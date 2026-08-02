@@ -2,32 +2,33 @@
   "author": {
     "name": "Independent cc-suite Codex adapter maintainers"
   },
-  "description": "A thin Codex-native skills adapter for an immutable cc-suite release.",
-  "homepage": "https://github.com/xiaolai/cc-suite",
+  "description": "A Codex-native cc-suite adapter with an optional bounded Qwen critic.",
+  "homepage": "https://github.com/linhui0813-byte/cc-suite-codex-adapter",
   "interface": {
     "capabilities": [
       "Interactive",
-      "Read",
-      "Write"
+      "Read"
     ],
     "category": "Productivity",
     "defaultPrompt": [
-      "Diagnose this cc-suite Codex adapter."
+      "Check Qwen review readiness.",
+      "Ask Qwen for a bounded read-only review."
     ],
     "developerName": "Independent cc-suite Codex adapter maintainers",
     "displayName": "cc-suite for Codex",
-    "longDescription": "Explicit-only Codex skills adapted from a pinned cc-suite release. No hooks or automatic bridge activation.",
-    "shortDescription": "Pinned cc-suite skills for Codex",
-    "websiteURL": "https://github.com/xiaolai/cc-suite"
+    "longDescription": "Explicit-only Codex workflows adapted from a pinned cc-suite release. Qwen is an optional read-only critic; Codex remains the editor and final judge.",
+    "shortDescription": "Codex workflows with optional Qwen review",
+    "websiteURL": "https://github.com/linhui0813-byte/cc-suite-codex-adapter"
   },
   "keywords": [
     "codex",
     "cc-suite",
-    "audit",
+    "qwen",
     "review"
   ],
   "license": "ISC",
   "name": "cc-suite-codex",
+  "repository": "https://github.com/linhui0813-byte/cc-suite-codex-adapter",
   "skills": "./skills/",
-  "version": "1.5.0+adapter.1"
+  "version": "1.5.0+codex.adapter-2"
 }

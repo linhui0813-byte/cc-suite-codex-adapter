@@ -1,12 +1,12 @@
 ---
 name: diagnose
-description: "Use when diagnosing the native cc-suite Codex adapter, checking skill visibility, provenance, optional Claude MCP tools, or explaining why an adapter workflow cannot run."
+description: "Use when diagnosing the native cc-suite Codex adapter, checking skill visibility and provenance, or explaining why the optional bounded Qwen reviewer cannot run."
 ---
 
 # Diagnose the Native Codex Adapter
 
 > Adapter boundary: this skill is explicit-only and read-only. It does not run
-> upstream bridge scripts or inspect the existing Claude plugin cache.
+> upstream bridge scripts, send a model prompt, or inspect credentials.
 
 ## 1. Verify visible package facts
 
@@ -16,17 +16,18 @@ Use the installed skill path shown in Codex's skill catalog to locate this
 `cc-suite-codex` and that the recorded tag, commit, and archive hash are
 non-empty.
 
-## 2. Verify optional tools
+## 2. Verify the packaged Qwen runtime
 
-Check whether `mcp__claude-code__claude_code` and
-`mcp__claude-code__claude_code_reply` are callable in the current session.
-Do not call them merely to test availability. Missing tools are a capability
-limit, not an adapter corruption.
+Confirm that `scripts/qwen-preflight.sh`, `scripts/qwen-runner.mjs`, and the four
+declared files under `scripts/lib/` exist beneath the same plugin root. Run the
+preflight script and parse its single JSON result. Preflight checks only the
+local Qwen version and sandbox provider; it does not send a prompt or test
+authentication.
 
 ## 3. Report bounded conclusions
 
-Report package provenance, visible skills, optional MCP availability, and any
-broken local reference. Do not claim the upstream Claude bridge, Qwen runner,
-hooks, or MCP registrations are healthy; those components are intentionally not
-packaged here.
-
+Report package provenance, visible skills, packaged runtime integrity, Qwen
+preflight status, and any broken local reference. A failed Qwen preflight means
+the optional critic is unavailable; it does not mean the Codex adapter's
+knowledge workflows are corrupt. Do not claim provider authentication is
+healthy until a user-authorized review succeeds.

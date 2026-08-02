@@ -1,26 +1,29 @@
 {
   "adapter": {
-    "revision": 1,
+    "repository": "https://github.com/linhui0813-byte/cc-suite-codex-adapter",
+    "revision": 2,
+    "runtime_files": [
+      "scripts/lib/delegation-boundary.mjs",
+      "scripts/lib/qwen-stream.mjs",
+      "scripts/lib/state.mjs",
+      "scripts/lib/workspace.mjs",
+      "scripts/qwen-preflight.sh",
+      "scripts/qwen-runner.mjs"
+    ],
     "selected_skills": [
       "agent-design",
-      "audit-fix",
-      "audit",
-      "claude-code-conventions",
-      "claude-debug",
-      "claude-implement",
-      "claude-plan",
-      "claude-review",
       "diagnose",
       "init",
-      "repair",
-      "verify"
+      "qwen-preflight",
+      "qwen-review",
+      "repair"
     ],
-    "sync_time": "2026-08-02T13:51:43Z",
-    "version": "1.5.0+adapter.1"
+    "sync_time": "2026-08-02T15:35:59Z",
+    "version": "1.5.0+codex.adapter-2"
   },
   "artifact": {
     "plugin_path": "plugins/cc-suite-codex",
-    "tree_sha256": "510482128d70428ab62daab9a18cdc324768bafb2e0dc1c65cf963bdb0637196"
+    "tree_sha256": "380b0f4f530ac7e92910f261061eb705550f84098a0723ec430c91e00819bfce"
   },
   "schema_version": 1,
   "upstream": {

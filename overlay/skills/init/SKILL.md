@@ -1,35 +1,29 @@
 ---
 name: init
-description: "Use when checking prerequisites for the native cc-suite Codex adapter, explaining optional Claude MCP setup, or preparing a project without changing the existing Claude installation."
+description: "Use when checking prerequisites for the native cc-suite Codex adapter, preparing a project, or explaining how its optional bounded Qwen reviewer is enabled without changing global configuration."
 version: 1.0.0
 ---
 
 # Initialize the Native Codex Adapter
 
 > Adapter boundary: this skill is explicit-only. Installing the plugin already
-> exposes its skills. This workflow never edits `.claude/`, `CLAUDE.md`, the
-> existing cc-suite installation, or global Codex configuration.
+> exposes its skills. This workflow never edits project instructions, another
+> cc-suite installation, Qwen settings, or global Codex configuration.
 
 ## 1. Check the project
 
 Read `AGENTS.md` and report whether `.codex/config.toml` exists. Do not create or
 rewrite either file unless the user separately asks for that project change.
 
-## 2. Check optional delegation
+## 2. Check the optional Qwen critic
 
-The audit and `claude-*` skills require tools named
-`mcp__claude-code__claude_code` and, for follow-ups,
-`mcp__claude-code__claude_code_reply`. If they are unavailable, report that
-delegation is unavailable and stop. Never fall back to Codex self-review while
-claiming an independent Claude review.
-
-If the tools exist, inspect only their callable schemas. Do not send a model
-request as a readiness probe and do not reveal credentials or environment
-values.
+Check Node.js 18.18.0 or newer, then run the packaged Qwen preflight. It checks
+the local `qwen` version and sandbox provider without sending a model request or
+inspecting credentials. Qwen is optional: a failed preflight disables only the
+independent Qwen review lane.
 
 ## 3. Report
 
-Report: plugin skills visible, project instructions present or absent, optional
-Claude MCP available or absent, and any manual next step. No bridge scripts are
-run by this native adapter.
-
+Report: plugin skills visible, project instructions present or absent, Node.js
+version, Qwen preflight status, and any manual next step. No MCP server, hook,
+or automatic bridge is installed by this adapter.

@@ -1,21 +1,34 @@
 schema_version = 1
-adapter_revision = 1
+adapter_revision = 2
 plugin_name = "cc-suite-codex"
 marketplace_name = "cc-suite-codex-adapter"
+adapter_repository = "https://github.com/linhui0813-byte/cc-suite-codex-adapter"
 
 selected_skills = [
   "agent-design",
-  "audit-fix",
-  "audit",
-  "claude-code-conventions",
-  "claude-debug",
-  "claude-implement",
-  "claude-plan",
-  "claude-review",
   "diagnose",
   "init",
+  "qwen-preflight",
+  "qwen-review",
   "repair",
-  "verify",
 ]
 
-overlay_skills = ["agent-design", "diagnose", "init", "repair"]
+overlay_skills = [
+  "agent-design",
+  "diagnose",
+  "init",
+  "qwen-preflight",
+  "qwen-review",
+  "repair",
+]
+
+runtime_files = [
+  "scripts/lib/delegation-boundary.mjs",
+  "scripts/lib/qwen-stream.mjs",
+  "scripts/lib/state.mjs",
+  "scripts/lib/workspace.mjs",
+  "scripts/qwen-preflight.sh",
+  "scripts/qwen-runner.mjs",
+]
+
+runtime_overlay_files = ["scripts/lib/delegation-boundary.mjs"]

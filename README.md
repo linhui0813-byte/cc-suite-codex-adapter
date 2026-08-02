@@ -1,10 +1,9 @@
 # cc-suite Codex adapter
 
-This is an independent, thin Codex adapter for the official
+This is an independent Codex adapter for the official
 [`xiaolai/cc-suite`](https://github.com/xiaolai/cc-suite). It tracks an immutable
-stable release tag, transforms selected Codex-facing skills, and builds a local
-Codex plugin. It is not a fork, does not modify upstream, and is not globally
-installed by this repository.
+stable release tag, applies native Codex overlays, and packages the upstream
+bounded Qwen review runtime. It is not a fork and does not modify upstream.
 
 ## Architecture
 
@@ -12,29 +11,31 @@ installed by this repository.
 official stable tag
   -> verify tag object + full commit
   -> download and SHA-256 the exact source archive
-  -> copy selected skills + apply four native overlays
+  -> apply six native Codex skill overlays
+  -> copy the exact allowlisted Qwen runtime dependency closure
+  -> replace only the Claude-specific delegation boundary
   -> force every skill to explicit-only
   -> generate plugin.json + repo marketplace.json
-  -> validate provenance, schemas, links, and safety boundaries
+  -> validate provenance, imports, schemas, links, and safety boundaries
 ```
 
 The current pin is in `provenance.lock.json`. Generated output lives in
 `plugins/cc-suite-codex/`; the repo marketplace is
 `.agents/plugins/marketplace.json`.
 
-## Why it is skills-only
+## Runtime boundary
 
-The upstream release is a Claude Code plugin that also exposes some skills to
-Codex. Blind copying would carry Claude commands, agents, bridge scripts,
-environment-variable assumptions, and hooks into a different runtime. This
-adapter packages 12 portable or usefully adaptable skills. `init`, `diagnose`,
-`repair`, and `agent-design` are native overlays; they never execute the old
-Claude bridge copy.
+The upstream release is a Claude Code plugin with several cross-runtime paths.
+Blind copying would carry Claude commands, agents, bridges, MCP assumptions,
+and hooks into Codex. This adapter packages six native, explicit-only skills
+and only the six files required by the bounded Qwen review runner.
 
-Every skill has `policy.allow_implicit_invocation: false`. Delegating skills
-must be selected explicitly and require a separately configured `claude-code`
-MCP server. Missing or broader-than-declared MCP tools are a hard stop; Codex
-must not label self-review as independent Claude review.
+Qwen is optional and read-only. It never runs automatically, receives no files
+without explicit user authorization, and has no write-enabled mode. The runner
+uses Safe Mode, Plan mode, sandboxing, an empty MCP set, exact tool discovery,
+isolated file copies, bounded `read_file` calls, hash verification, and strict
+terminal-result validation. Codex remains the primary agent, editor, verifier,
+and final judge.
 
 ## Update and verify
 
@@ -74,23 +75,19 @@ codex plugin marketplace add .
 codex plugin add cc-suite-codex@cc-suite-codex-adapter
 ```
 
-Start a new thread, select `$diagnose`, and verify its provenance report. These
-are instructions only; this repository does not run them or modify global Codex
-configuration. For an upgrade, sync and validate first, reinstall from the same
-marketplace, then start a new thread.
+Start a new thread, select `$diagnose`, and verify its provenance report. Use
+`$qwen-preflight` for a zero-prompt local readiness check and `$qwen-review`
+only when you intentionally want to send a prompt or named files to Qwen. For
+an upgrade, sync and validate first, reinstall from the same marketplace, then
+start a new thread.
 
 ## Intentionally not ported
 
-- Claude slash commands and native agent definitions
-- upstream runtime and bridge scripts
+- Claude slash commands, delegation skills, and native agent definitions
+- every upstream runtime except the exact bounded Qwen dependency closure
 - automatic `.mcp.json` or `.codex/config.toml` registration
-- Qwen, Grok, Antigravity, opencode, or Kimi runners and bridges
+- Grok, Antigravity, opencode, Kimi, and Claude runners or bridges
 - upstream Claude hooks (`SessionStart`, `SessionEnd`, and `Stop`)
 - the vocabulary skill, which assumes NLPM and Claude-specific paths
-
-The Qwen reviewer is omitted rather than weakened. Its upstream safety depends
-on exact tool/MCP verification, isolated targets, bounded reads, terminal-result
-validation, and source-hash checks. A prompt-only copy would not preserve those
-fail-closed guarantees.
 
 See `PORTING.md` for the component decision record.

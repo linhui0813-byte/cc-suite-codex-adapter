@@ -1,8 +1,47 @@
 {
-  "adapter_version": "1.5.0+adapter.1",
+  "adapter_repository": "https://github.com/linhui0813-byte/cc-suite-codex-adapter",
+  "adapter_version": "1.5.0+codex.adapter-2",
   "archive_sha256": "fe4d8120d1874d6f361652de186decc5f223f7b4d93427853a3442a2bfba0e79",
   "commit": "a03fbb4d175141f38a605698054191c834802d8a",
   "plugin_name": "cc-suite-codex",
+  "runtime_files": [
+    {
+      "origin": "adapter-overlay",
+      "packaged_sha256": "29cdbef12c47f179fbe0c6094b7ba478ead32426f3579d8509ba86b10536ee13",
+      "path": "scripts/lib/delegation-boundary.mjs",
+      "upstream_sha256": "20cf31e9ff987102cd900abe0d764e35609943a79d0d85d37a04f3d764411fe7"
+    },
+    {
+      "origin": "upstream",
+      "packaged_sha256": "45390f2967cc152f23856908e31c328ed6fe6ec808f5852b905580a40fd34339",
+      "path": "scripts/lib/qwen-stream.mjs",
+      "upstream_sha256": "45390f2967cc152f23856908e31c328ed6fe6ec808f5852b905580a40fd34339"
+    },
+    {
+      "origin": "upstream",
+      "packaged_sha256": "7a943bd5c8b8df6439c00c68ad7cb87c3cdf55593d8fe6c7fb4e93fc088b8664",
+      "path": "scripts/lib/state.mjs",
+      "upstream_sha256": "7a943bd5c8b8df6439c00c68ad7cb87c3cdf55593d8fe6c7fb4e93fc088b8664"
+    },
+    {
+      "origin": "upstream",
+      "packaged_sha256": "0b7d9a54ba3e6f7aff1e016de2f1aa1901e65b4bbe2152610874a8375932d3c0",
+      "path": "scripts/lib/workspace.mjs",
+      "upstream_sha256": "0b7d9a54ba3e6f7aff1e016de2f1aa1901e65b4bbe2152610874a8375932d3c0"
+    },
+    {
+      "origin": "upstream",
+      "packaged_sha256": "39ac9ad9cabf03ac3fd8c020313b457a0e39559b224ba83400ae10d3f557f2a3",
+      "path": "scripts/qwen-preflight.sh",
+      "upstream_sha256": "39ac9ad9cabf03ac3fd8c020313b457a0e39559b224ba83400ae10d3f557f2a3"
+    },
+    {
+      "origin": "deterministic-transform",
+      "packaged_sha256": "27174aabe75a52aecf10b236ff3fdd3720bebbf503b8f40814e1df6e3021b0cc",
+      "path": "scripts/qwen-runner.mjs",
+      "upstream_sha256": "23b16e8818644a44d378d0e00c066e988275e33b7f89ad2c3f24377d2e0c17c6"
+    }
+  ],
   "source": "https://github.com/xiaolai/cc-suite",
   "tag": "v1.5.0",
   "tag_object": "b0cca9f0c5cb2e83a057238058258ddb38e6e0da"

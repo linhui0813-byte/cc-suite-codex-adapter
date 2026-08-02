@@ -5,6 +5,6 @@ This independent adapter contains transformed portions of
 ISC license in `LICENSE`. Xiaolai Li owns the upstream work. This repository is
 not an official upstream fork and does not claim endorsement by the maintainer.
 
-The exact upstream tag, commit, archive hash, adapter version, and sync time are
-recorded in `provenance.lock.json` and copied into the generated plugin.
-
+The exact upstream tag, commit, archive hash, adapter version, sync time, and
+per-file Qwen runtime hashes are recorded in `provenance.lock.json` or the
+generated plugin's `UPSTREAM_PROVENANCE.json`.

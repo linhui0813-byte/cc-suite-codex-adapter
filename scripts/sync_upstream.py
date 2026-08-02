@@ -50,7 +50,9 @@ def main() -> None:
         synced_at = args.synced_at or dt.datetime.now(dt.timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
         lock = {
             "adapter": {
+                "repository": config["adapter_repository"],
                 "revision": config["adapter_revision"],
+                "runtime_files": config["runtime_files"],
                 "selected_skills": config["selected_skills"],
                 "sync_time": synced_at,
                 "version": adapter_version(tag, config["adapter_revision"]),

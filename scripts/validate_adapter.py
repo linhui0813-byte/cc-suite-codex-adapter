@@ -11,6 +11,16 @@ SHA = re.compile(r"^[0-9a-f]{40}$")
 SHA256 = re.compile(r"^[0-9a-f]{64}$")
 SEMVER = re.compile(r"^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$")
 LINK = re.compile(r"\[[^\]]+\]\(([^)]+)\)")
+LOCAL_IMPORT = re.compile(r'from\s+["\'](\./[^"\']+)["\']')
+REMOVED_CLAUDE_SKILLS = {
+    "audit",
+    "audit-fix",
+    "claude-debug",
+    "claude-implement",
+    "claude-plan",
+    "claude-review",
+    "verify",
+}
 
 
 def main() -> int:
@@ -33,9 +43,13 @@ def main() -> int:
     check(SHA256.fullmatch(lock["upstream"]["archive_sha256"]) is not None, "archive hash must be SHA-256")
     expected_version = adapter_version(lock["upstream"]["tag"], config["adapter_revision"])
     check(lock["adapter"]["version"] == expected_version, "adapter version mismatch")
+    check(lock["adapter"].get("repository") == config["adapter_repository"], "adapter repository lock mismatch")
+    check(lock["adapter"].get("runtime_files") == config["runtime_files"], "runtime lock mismatch")
     check(manifest["name"] == config["plugin_name"] == plugin.name, "plugin name mismatch")
     check(SEMVER.fullmatch(manifest["version"]) is not None, "plugin version is not semver")
     check(manifest["version"] == expected_version, "manifest version mismatch")
+    check(manifest.get("repository") == config["adapter_repository"], "manifest repository mismatch")
+    check(manifest.get("homepage") == config["adapter_repository"], "manifest homepage mismatch")
     check(manifest.get("skills") == "./skills/", "manifest skills path is not canonical")
     check(not any(key in manifest for key in ("hooks", "mcpServers", "apps")), "unverified runtime component in manifest")
     check(marketplace["name"] == config["marketplace_name"], "marketplace name mismatch")
@@ -44,11 +58,13 @@ def main() -> int:
     check(entry["source"] == {"path": f"./plugins/{config['plugin_name']}", "source": "local"}, "marketplace source mismatch")
     check(entry["policy"] == {"authentication": "ON_INSTALL", "installation": "AVAILABLE"}, "marketplace policy mismatch")
     check(provenance["commit"] == lock["upstream"]["commit"], "plugin provenance commit mismatch")
+    check(provenance.get("adapter_repository") == config["adapter_repository"], "plugin adapter repository mismatch")
     check(provenance["archive_sha256"] == lock["upstream"]["archive_sha256"], "plugin provenance archive mismatch")
     check(sha256_file(plugin / "LICENSE") == lock["upstream"]["license_sha256"], "packaged license hash mismatch")
     check(tree_hash(plugin) == lock["artifact"]["tree_sha256"], "generated tree hash mismatch")
 
     selected = set(config["selected_skills"])
+    check(not selected & REMOVED_CLAUDE_SKILLS, "Claude delegation skills remain selected")
     actual = {p.name for p in (plugin / "skills").iterdir() if p.is_dir()}
     check(actual == selected, f"skill set mismatch: expected {sorted(selected)}, got {sorted(actual)}")
     for skill in sorted(actual):
@@ -59,22 +75,67 @@ def main() -> int:
         check(sidecar.read_text().endswith("allow_implicit_invocation: false\n"), f"{skill}: not explicit-only")
         if skill in config["overlay_skills"]:
             check("CLAUDE_PLUGIN_ROOT" not in text and ".claude/skills/cc-suite" not in text, f"{skill}: stale bridge-root resolution")
+        check("/cc-suite:" not in text, f"{skill}: unported Claude slash command")
+
+    expected_runtime = set(config["runtime_files"])
+    actual_runtime = {
+        path.relative_to(plugin).as_posix()
+        for path in (plugin / "scripts").rglob("*")
+        if path.is_file()
+    }
+    check(actual_runtime == expected_runtime, f"runtime set mismatch: expected {sorted(expected_runtime)}, got {sorted(actual_runtime)}")
+    runtime_records = {entry["path"]: entry for entry in provenance.get("runtime_files", [])}
+    check(set(runtime_records) == expected_runtime, "runtime provenance set mismatch")
+    for relative in sorted(expected_runtime):
+        packaged = plugin / relative
+        record = runtime_records.get(relative, {})
+        if packaged.is_file():
+            check(sha256_file(packaged) == record.get("packaged_sha256"), f"{relative}: packaged runtime hash mismatch")
+        check(SHA256.fullmatch(record.get("upstream_sha256", "")) is not None, f"{relative}: invalid upstream runtime hash")
+        expected_origin = "adapter-overlay" if relative in config["runtime_overlay_files"] else None
+        if expected_origin:
+            check(record.get("origin") == expected_origin, f"{relative}: runtime overlay provenance mismatch")
+
+    for script in (plugin / "scripts").rglob("*.mjs"):
+        text = script.read_text(encoding="utf-8")
+        for target in LOCAL_IMPORT.findall(text):
+            check((script.parent / target).resolve().is_file(), f"{script.relative_to(plugin)}: unresolved local import {target}")
+
+    runner_text = (plugin / "scripts/qwen-runner.mjs").read_text(encoding="utf-8")
+    stream_text = (plugin / "scripts/lib/qwen-stream.mjs").read_text(encoding="utf-8")
+    boundary_text = (plugin / "scripts/lib/delegation-boundary.mjs").read_text(encoding="utf-8")
+    preflight_text = (plugin / "scripts/qwen-preflight.sh").read_text(encoding="utf-8")
+    for marker in (
+        '"--safe-mode"',
+        '"--sandbox"',
+        '"--approval-mode", "plan"',
+        '"--exclude-tools"',
+        '"--max-tool-calls"',
+        'verifyReviewTargets',
+        'stageReviewTargets',
+    ):
+        check(marker in runner_text, f"qwen runner missing safety marker: {marker}")
+    for marker in ("tool_boundary_mismatch", "forbidden_tool_path", "result_before_init", "duplicate_result"):
+        check(marker in stream_text, f"Qwen stream observer missing fail-closed marker: {marker}")
+    check("Codex retains final judgment and all implementation authority." in boundary_text, "Codex-native delegation boundary missing")
+    check("--prompt" not in preflight_text, "Qwen preflight must not send a prompt")
 
     for path in plugin.rglob("*"):
-        if not path.is_file() or path.suffix.lower() not in {".md", ".json", ".yaml", ".yml"}:
+        if path.is_symlink():
+            check(False, f"symlink is not allowed in plugin: {path.relative_to(plugin)}")
+        if not path.is_file() or path.suffix.lower() not in {".md", ".json", ".yaml", ".yml", ".mjs", ".sh"}:
             continue
         text = path.read_text(encoding="utf-8")
         check("/Users/" not in text and "file:///" not in text, f"{path.relative_to(plugin)}: unsafe absolute path")
-        if "claude-code-conventions" not in path.parts:
-            check("CLAUDE_PLUGIN_ROOT" not in text, f"{path.relative_to(plugin)}: Claude-only runtime variable")
-            check(".claude/skills/cc-suite" not in text, f"{path.relative_to(plugin)}: stale Claude bridge path")
+        check("CLAUDE_PLUGIN_ROOT" not in text, f"{path.relative_to(plugin)}: Claude-only runtime variable")
+        check(".claude/skills/cc-suite" not in text, f"{path.relative_to(plugin)}: stale Claude bridge path")
         for target in LINK.findall(text):
             clean = target.split("#", 1)[0]
             if not clean or clean.startswith(("https://", "http://", "mailto:", "codex://", "#")):
                 continue
             check((path.parent / clean).resolve().exists(), f"{path.relative_to(plugin)}: broken link {target}")
 
-    for runtime_dir in ("hooks", "commands", "scripts", "agents"):
+    for runtime_dir in ("hooks", "commands", "agents"):
         check(not (plugin / runtime_dir).exists(), f"accidental runtime directory: {runtime_dir}")
     if errors:
         print("adapter validation failed:", file=sys.stderr)

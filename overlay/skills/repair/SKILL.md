@@ -11,16 +11,16 @@ version: 1.0.0
 
 ## 1. Diagnose first
 
-Run the read-only checks from `$diagnose`. If only optional Claude MCP tools are
-missing, report the missing prerequisite; reinstalling this skills-only plugin
-will not create that server.
+Run the read-only checks from `$diagnose`. If only Qwen or its sandbox provider
+is missing, report the missing prerequisite; reinstalling the plugin will not
+install or configure those external programs.
 
 ## 2. Use package-manager boundaries
 
 If package files are missing or provenance is invalid, instruct the user to
 rebuild and validate the adapter repository, then reinstall through the
 configured `cc-suite-codex-adapter` marketplace. Do not hand-edit Codex's plugin
-cache or global configuration.
+cache, Qwen settings, or global configuration.
 
 ## 3. Verify in a new thread
 
