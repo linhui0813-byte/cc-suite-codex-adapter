@@ -63,7 +63,9 @@ python3 ~/.codex/skills/.system/plugin-creator/scripts/validate_plugin.py \
 The lock records the upstream tag, annotated-tag object, peeled commit, archive
 SHA-256, ISC license SHA-256, adapter version, sync time, and generated tree
 hash. The update check fails closed if the pinned tag disappears or moves. A
-new candidate is never activated automatically.
+new candidate is never activated automatically. The write-enabled update job
+does not execute newly imported upstream JavaScript; full runtime tests run in
+a separate CI workflow with read-only repository permission.
 
 ## Local install after review
 

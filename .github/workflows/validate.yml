@@ -1,0 +1,25 @@
+name: Validate cc-suite Codex adapter
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - name: Verify toolchain
+        run: |
+          python3 --version
+          node --version
+      - name: Validate generated adapter
+        run: python3 scripts/validate_adapter.py
+      - name: Run adapter and bounded-Qwen security tests
+        run: python3 -m unittest discover -s tests -v

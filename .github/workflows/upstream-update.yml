@@ -28,10 +28,13 @@ jobs:
         name: Sync exact tag and build candidate
         run: python3 scripts/sync_upstream.py
       - if: steps.check.outputs.available == 'true'
-        name: Validate candidate before any branch write
+        name: Statically validate candidate before any branch write
+        # This job has repository write permission. Never execute newly copied
+        # upstream runtime code here; the read-only validation workflow tests
+        # the pull request after it is created.
         run: |
+          python3 -m py_compile scripts/*.py tests/test_adapter.py
           python3 scripts/validate_adapter.py
-          python3 -m unittest discover -s tests -v
       - if: steps.check.outputs.available == 'true'
         name: Prepare update branch and pull request
         env:
