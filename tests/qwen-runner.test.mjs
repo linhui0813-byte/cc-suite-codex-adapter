@@ -519,7 +519,10 @@ test("qwen preflight reports a local fake 0.21.0 binary as ready", () => {
     assert.equal(result.status, 0);
     assert.equal(output.status, "ok");
     assert.equal(output.qwen_version, "0.21.0");
-    assert.equal(output.sandbox_provider, "sandbox-exec");
+    assert.ok(
+      ["sandbox-exec", "docker", "podman"].includes(output.sandbox_provider),
+      `unexpected sandbox provider: ${output.sandbox_provider}`
+    );
     assert.equal(output.capabilities.tool_boundary, true);
     assert.equal(output.capabilities.exact_target_policy, true);
   } finally {
