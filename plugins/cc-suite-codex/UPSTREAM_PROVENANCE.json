@@ -1,0 +1,9 @@
+{
+  "adapter_version": "1.5.0+adapter.1",
+  "archive_sha256": "fe4d8120d1874d6f361652de186decc5f223f7b4d93427853a3442a2bfba0e79",
+  "commit": "a03fbb4d175141f38a605698054191c834802d8a",
+  "plugin_name": "cc-suite-codex",
+  "source": "https://github.com/xiaolai/cc-suite",
+  "tag": "v1.5.0",
+  "tag_object": "b0cca9f0c5cb2e83a057238058258ddb38e6e0da"
+}

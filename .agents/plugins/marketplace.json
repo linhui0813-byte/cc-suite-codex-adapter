@@ -1,0 +1,20 @@
+{
+  "interface": {
+    "displayName": "cc-suite Codex Adapter"
+  },
+  "name": "cc-suite-codex-adapter",
+  "plugins": [
+    {
+      "category": "Productivity",
+      "name": "cc-suite-codex",
+      "policy": {
+        "authentication": "ON_INSTALL",
+        "installation": "AVAILABLE"
+      },
+      "source": {
+        "path": "./plugins/cc-suite-codex",
+        "source": "local"
+      }
+    }
+  ]
+}

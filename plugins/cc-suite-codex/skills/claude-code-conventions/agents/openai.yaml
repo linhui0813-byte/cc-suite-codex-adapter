@@ -1,0 +1,6 @@
+# Adapter safety boundary: no imported skill runs implicitly.
+interface:
+  display_name: "Claude Code Conventions"
+  short_description: "Explicit-only cc-suite workflow"
+policy:
+  allow_implicit_invocation: false

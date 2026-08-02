@@ -1,0 +1,33 @@
+{
+  "author": {
+    "name": "Independent cc-suite Codex adapter maintainers"
+  },
+  "description": "A thin Codex-native skills adapter for an immutable cc-suite release.",
+  "homepage": "https://github.com/xiaolai/cc-suite",
+  "interface": {
+    "capabilities": [
+      "Interactive",
+      "Read",
+      "Write"
+    ],
+    "category": "Productivity",
+    "defaultPrompt": [
+      "Diagnose this cc-suite Codex adapter."
+    ],
+    "developerName": "Independent cc-suite Codex adapter maintainers",
+    "displayName": "cc-suite for Codex",
+    "longDescription": "Explicit-only Codex skills adapted from a pinned cc-suite release. No hooks or automatic bridge activation.",
+    "shortDescription": "Pinned cc-suite skills for Codex",
+    "websiteURL": "https://github.com/xiaolai/cc-suite"
+  },
+  "keywords": [
+    "codex",
+    "cc-suite",
+    "audit",
+    "review"
+  ],
+  "license": "ISC",
+  "name": "cc-suite-codex",
+  "skills": "./skills/",
+  "version": "1.5.0+adapter.1"
+}

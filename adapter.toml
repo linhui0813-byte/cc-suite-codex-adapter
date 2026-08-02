@@ -1,0 +1,21 @@
+schema_version = 1
+adapter_revision = 1
+plugin_name = "cc-suite-codex"
+marketplace_name = "cc-suite-codex-adapter"
+
+selected_skills = [
+  "agent-design",
+  "audit-fix",
+  "audit",
+  "claude-code-conventions",
+  "claude-debug",
+  "claude-implement",
+  "claude-plan",
+  "claude-review",
+  "diagnose",
+  "init",
+  "repair",
+  "verify",
+]
+
+overlay_skills = ["agent-design", "diagnose", "init", "repair"]
