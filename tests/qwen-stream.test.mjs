@@ -317,6 +317,63 @@ test("session_start after init does not revalidate or replace the verified bound
   }
 });
 
+test("a Qwen 0.21.4 goal_state stream event is accepted after init", () => {
+  const dir = makeTempDir("qwen-stream-");
+  try {
+    const state = createQwenStreamState({ cwd: dir });
+    consumeQwenEvent(state, initEvent());
+    consumeQwenEvent(state, {
+      type: "stream_event",
+      session_id: "session-1",
+      parent_tool_use_id: null,
+      event: {
+        type: "goal_state",
+        goal_state: { status: "active" },
+      },
+    });
+    consumeQwenEvent(state, resultEvent());
+    assert.equal(state.result, "review complete");
+    assert.equal(state.events, 3);
+  } finally {
+    cleanupDir(dir);
+  }
+});
+
+test("stream events before init and unknown stream event types fail closed", () => {
+  const dir = makeTempDir("qwen-stream-");
+  try {
+    const beforeInit = createQwenStreamState({ cwd: dir });
+    assert.throws(
+      () => consumeQwenEvent(beforeInit, {
+        type: "stream_event",
+        session_id: "session-1",
+        event: { type: "goal_state", goal_state: {} },
+      }),
+      (error) => error.code === "stream_event_before_init"
+    );
+
+    const malformed = createQwenStreamState({ cwd: dir });
+    consumeQwenEvent(malformed, initEvent());
+    assert.throws(
+      () => consumeQwenEvent(malformed, { type: "stream_event", session_id: "session-1" }),
+      (error) => error.code === "malformed_stream_event"
+    );
+
+    const unknown = createQwenStreamState({ cwd: dir });
+    consumeQwenEvent(unknown, initEvent());
+    assert.throws(
+      () => consumeQwenEvent(unknown, {
+        type: "stream_event",
+        session_id: "session-1",
+        event: { type: "content_block_delta", delta: { type: "tool_use" } },
+      }),
+      (error) => error.code === "unsupported_stream_event"
+    );
+  } finally {
+    cleanupDir(dir);
+  }
+});
+
 test("unknown top-level events fail closed", () => {
   const dir = makeTempDir("qwen-stream-");
   try {

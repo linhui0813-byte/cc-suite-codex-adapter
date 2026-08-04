@@ -59,6 +59,14 @@ emit({
   tools,
   mcp_servers: [],
 });
+if (mode === "goal-stream") {
+  emit({
+    type: "stream_event",
+    session_id: session,
+    parent_tool_use_id: null,
+    event: { type: "goal_state", goal_state: { status: "active" } },
+  });
+}
 if (mode === "timeout-resume" && !resumed) {
   process.stdout.write('{"type":"assistant"');
   setInterval(() => {}, 1000);
@@ -153,6 +161,17 @@ test("qwen runner accepts only a terminal success plus exit 0", () => {
     assert.equal(run.output.rawOutput, "review");
     assert.equal(run.output.threadId, "fake-qwen-session");
     assert.equal(run.output.attempts.length, 1);
+  } finally {
+    cleanupDir(run.dir);
+  }
+});
+
+test("qwen runner accepts the Qwen 0.21.4 goal_state stream event", () => {
+  const run = runFake("goal-stream");
+  try {
+    assert.equal(run.result.status, 0, JSON.stringify(run.output));
+    assert.equal(run.output.status, "completed");
+    assert.equal(run.output.rawOutput, "review");
   } finally {
     cleanupDir(run.dir);
   }

@@ -26,13 +26,57 @@ def sha256_bytes(value: bytes) -> str:
 
 
 def transform_runtime(path: str, value: bytes) -> bytes:
-    if path != "scripts/qwen-runner.mjs":
-        return value
     text = value.decode("utf-8")
-    old = "install Qwen Code, then run /cc-suite:qwen-preflight"
-    if text.count(old) != 1:
-        raise ValueError("upstream Qwen preflight hint changed; review the runtime transform")
-    text = text.replace(old, "install Qwen Code, then invoke $cc-suite-codex:qwen-preflight")
+    if path == "scripts/qwen-runner.mjs":
+        old = "install Qwen Code, then run /cc-suite:qwen-preflight"
+        if text.count(old) != 1:
+            raise ValueError("upstream Qwen preflight hint changed; review the runtime transform")
+        text = text.replace(old, "install Qwen Code, then invoke $cc-suite-codex:qwen-preflight")
+    elif path == "scripts/lib/qwen-stream.mjs":
+        old_switch = '''    case "result":
+      inspectResult(state, event);
+      return;
+    default:'''
+        new_switch = '''    case "stream_event": {
+      if (!state.initSeen) {
+        throw new QwenStreamError(
+          "stream_event_before_init",
+          "Qwen emitted a stream event before init"
+        );
+      }
+      const streamPayload = event.event;
+      if (!streamPayload || typeof streamPayload !== "object" || Array.isArray(streamPayload)) {
+        throw new QwenStreamError(
+          "malformed_stream_event",
+          "Qwen emitted a malformed stream event"
+        );
+      }
+      if (streamPayload.type !== "goal_state") {
+        throw new QwenStreamError(
+          "unsupported_stream_event",
+          `Qwen emitted unsupported stream event type: ${streamPayload.type ?? "(missing)"}`
+        );
+      }
+      return;
+    }
+    case "result":
+      inspectResult(state, event);
+      return;
+    default:'''
+        if text.count(old_switch) != 1:
+            raise ValueError("upstream Qwen stream switch changed; review the runtime transform")
+        text = text.replace(old_switch, new_switch)
+
+        old_description = '''export function describeQwenEvent(event) {
+  if (event.type === "system") return `event system/${event.subtype ?? "unknown"}`;'''
+        new_description = '''export function describeQwenEvent(event) {
+  if (event.type === "system") return `event system/${event.subtype ?? "unknown"}`;
+  if (event.type === "stream_event") {
+    return `event stream_event/${event.event?.type ?? "unknown"}`;
+  }'''
+        if text.count(old_description) != 1:
+            raise ValueError("upstream Qwen event description changed; review the runtime transform")
+        text = text.replace(old_description, new_description)
     return text.encode("utf-8")
 
 

@@ -518,6 +518,28 @@ export function consumeQwenEvent(state, event) {
       }
       consumeToolResults(state, event);
       return;
+    case "stream_event": {
+      if (!state.initSeen) {
+        throw new QwenStreamError(
+          "stream_event_before_init",
+          "Qwen emitted a stream event before init"
+        );
+      }
+      const streamPayload = event.event;
+      if (!streamPayload || typeof streamPayload !== "object" || Array.isArray(streamPayload)) {
+        throw new QwenStreamError(
+          "malformed_stream_event",
+          "Qwen emitted a malformed stream event"
+        );
+      }
+      if (streamPayload.type !== "goal_state") {
+        throw new QwenStreamError(
+          "unsupported_stream_event",
+          `Qwen emitted unsupported stream event type: ${streamPayload.type ?? "(missing)"}`
+        );
+      }
+      return;
+    }
     case "result":
       inspectResult(state, event);
       return;
@@ -531,6 +553,9 @@ export function consumeQwenEvent(state, event) {
 
 export function describeQwenEvent(event) {
   if (event.type === "system") return `event system/${event.subtype ?? "unknown"}`;
+  if (event.type === "stream_event") {
+    return `event stream_event/${event.event?.type ?? "unknown"}`;
+  }
   if (event.type === "result") {
     return `event result/${event.subtype ?? "unknown"} is_error=${String(event.is_error ?? event.isError)}`;
   }

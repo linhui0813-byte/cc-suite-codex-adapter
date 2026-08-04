@@ -130,7 +130,14 @@ def main() -> int:
         'stageReviewTargets',
     ):
         check(marker in runner_text, f"qwen runner missing safety marker: {marker}")
-    for marker in ("tool_boundary_mismatch", "forbidden_tool_path", "result_before_init", "duplicate_result"):
+    for marker in (
+        "tool_boundary_mismatch",
+        "forbidden_tool_path",
+        "result_before_init",
+        "duplicate_result",
+        "stream_event_before_init",
+        "unsupported_stream_event",
+    ):
         check(marker in stream_text, f"Qwen stream observer missing fail-closed marker: {marker}")
     check("Codex retains final judgment and all implementation authority." in boundary_text, "Codex-native delegation boundary missing")
     check("--prompt" not in preflight_text, "Qwen preflight must not send a prompt")

@@ -1,6 +1,6 @@
 {
   "adapter_repository": "https://github.com/linhui0813-byte/cc-suite-codex-adapter",
-  "adapter_version": "1.5.0+codex.adapter-3",
+  "adapter_version": "1.5.0+codex.adapter-4",
   "archive_sha256": "fe4d8120d1874d6f361652de186decc5f223f7b4d93427853a3442a2bfba0e79",
   "commit": "a03fbb4d175141f38a605698054191c834802d8a",
   "plugin_name": "cc-suite-codex",
@@ -12,8 +12,8 @@
       "upstream_sha256": "20cf31e9ff987102cd900abe0d764e35609943a79d0d85d37a04f3d764411fe7"
     },
     {
-      "origin": "upstream",
-      "packaged_sha256": "45390f2967cc152f23856908e31c328ed6fe6ec808f5852b905580a40fd34339",
+      "origin": "deterministic-transform",
+      "packaged_sha256": "ffaa40d884f12dc101121ff1f678424dc9fa536d07463c02fab8ba81d631d5cf",
       "path": "scripts/lib/qwen-stream.mjs",
       "upstream_sha256": "45390f2967cc152f23856908e31c328ed6fe6ec808f5852b905580a40fd34339"
     },

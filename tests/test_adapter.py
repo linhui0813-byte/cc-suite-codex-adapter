@@ -33,7 +33,7 @@ class AdapterTests(unittest.TestCase):
         self.assertEqual(refs["commit"], "a03fbb4d175141f38a605698054191c834802d8a")
 
     def test_adapter_version_uses_codex_cachebuster(self) -> None:
-        self.assertEqual(adapter_version("v1.5.0", 3), "1.5.0+codex.adapter-3")
+        self.assertEqual(adapter_version("v1.5.0", 4), "1.5.0+codex.adapter-4")
 
     def test_generated_tree_matches_lock(self) -> None:
         self.assertEqual(tree_hash(self.plugin), self.lock["artifact"]["tree_sha256"])
