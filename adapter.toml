@@ -1,5 +1,5 @@
 schema_version = 1
-adapter_revision = 2
+adapter_revision = 3
 plugin_name = "cc-suite-codex"
 marketplace_name = "cc-suite-codex-adapter"
 adapter_repository = "https://github.com/linhui0813-byte/cc-suite-codex-adapter"
@@ -8,6 +8,7 @@ selected_skills = [
   "agent-design",
   "diagnose",
   "init",
+  "qwen-audit-fix",
   "qwen-preflight",
   "qwen-review",
   "repair",
@@ -17,6 +18,7 @@ overlay_skills = [
   "agent-design",
   "diagnose",
   "init",
+  "qwen-audit-fix",
   "qwen-preflight",
   "qwen-review",
   "repair",

@@ -2,5 +2,6 @@
 interface:
   display_name: "Qwen Preflight"
   short_description: "Explicit-only cc-suite workflow"
+  default_prompt: "Use $qwen-preflight for this explicit cc-suite workflow."
 policy:
   allow_implicit_invocation: false

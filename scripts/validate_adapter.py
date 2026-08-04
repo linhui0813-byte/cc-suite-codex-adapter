@@ -73,9 +73,24 @@ def main() -> int:
         text = skill_file.read_text(encoding="utf-8")
         check(text.startswith("---\n") and "\nname:" in text and "\ndescription:" in text, f"{skill}: invalid frontmatter")
         check(sidecar.read_text().endswith("allow_implicit_invocation: false\n"), f"{skill}: not explicit-only")
+        check(f"Use ${skill}" in sidecar.read_text(), f"{skill}: sidecar default prompt does not name the skill")
         if skill in config["overlay_skills"]:
             check("CLAUDE_PLUGIN_ROOT" not in text and ".claude/skills/cc-suite" not in text, f"{skill}: stale bridge-root resolution")
         check("/cc-suite:" not in text, f"{skill}: unported Claude slash command")
+
+    audit_fix = plugin / "skills/qwen-audit-fix/SKILL.md"
+    check(audit_fix.is_file(), "qwen-audit-fix skill is missing")
+    if audit_fix.is_file():
+        audit_text = audit_fix.read_text(encoding="utf-8")
+        for marker in (
+            "maximum Qwen calls",
+            ".cc-suite/audits/qwen-audit-fix-",
+            "Qwen output is a hypothesis, not proof.",
+            "Start a fresh Qwen review",
+            "every authorized batch",
+            "Run 1–3 fix/test/re-audit rounds",
+        ):
+            check(marker in audit_text, f"qwen-audit-fix missing workflow marker: {marker}")
 
     expected_runtime = set(config["runtime_files"])
     actual_runtime = {
@@ -119,6 +134,7 @@ def main() -> int:
         check(marker in stream_text, f"Qwen stream observer missing fail-closed marker: {marker}")
     check("Codex retains final judgment and all implementation authority." in boundary_text, "Codex-native delegation boundary missing")
     check("--prompt" not in preflight_text, "Qwen preflight must not send a prompt")
+    check(len(manifest.get("interface", {}).get("defaultPrompt", [])) <= 3, "manifest exposes more than three default prompts")
 
     for path in plugin.rglob("*"):
         if path.is_symlink():

@@ -63,6 +63,7 @@ def build(source: Path, lock: dict) -> str:
                 "interface:\n"
                 f"  display_name: \"{display_name}\"\n"
                 "  short_description: \"Explicit-only cc-suite workflow\"\n"
+                f"  default_prompt: \"Use ${skill} for this explicit cc-suite workflow.\"\n"
                 "policy:\n  allow_implicit_invocation: false\n",
                 encoding="utf-8",
             )
@@ -90,7 +91,7 @@ def build(source: Path, lock: dict) -> str:
         version = adapter_version(lock["upstream"]["tag"], config["adapter_revision"])
         manifest = {
             "author": {"name": "Independent cc-suite Codex adapter maintainers"},
-            "description": "A Codex-native cc-suite adapter with an optional bounded Qwen critic.",
+            "description": "A Codex-native cc-suite adapter with bounded Qwen review and audit-fix workflows.",
             "homepage": config["adapter_repository"],
             "interface": {
                 "capabilities": ["Interactive", "Read"],
@@ -98,11 +99,12 @@ def build(source: Path, lock: dict) -> str:
                 "defaultPrompt": [
                     "Check Qwen review readiness.",
                     "Ask Qwen for a bounded read-only review.",
+                    "Audit exact files with Qwen, fix accepted findings, and re-audit until clean.",
                 ],
                 "developerName": "Independent cc-suite Codex adapter maintainers",
                 "displayName": "cc-suite for Codex",
-                "longDescription": "Explicit-only Codex workflows adapted from a pinned cc-suite release. Qwen is an optional read-only critic; Codex remains the editor and final judge.",
-                "shortDescription": "Codex workflows with optional Qwen review",
+                "longDescription": "Explicit-only Codex workflows adapted from a pinned cc-suite release. Qwen is an optional read-only critic for bounded review or audit-fix cycles; Codex remains the editor and final judge.",
+                "shortDescription": "Codex workflows with Qwen review and audit-fix",
                 "websiteURL": config["adapter_repository"],
             },
             "keywords": ["codex", "cc-suite", "qwen", "review"],

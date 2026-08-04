@@ -1,6 +1,6 @@
 {
   "adapter_repository": "https://github.com/linhui0813-byte/cc-suite-codex-adapter",
-  "adapter_version": "1.5.0+codex.adapter-2",
+  "adapter_version": "1.5.0+codex.adapter-3",
   "archive_sha256": "fe4d8120d1874d6f361652de186decc5f223f7b4d93427853a3442a2bfba0e79",
   "commit": "a03fbb4d175141f38a605698054191c834802d8a",
   "plugin_name": "cc-suite-codex",

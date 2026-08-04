@@ -33,7 +33,7 @@ class AdapterTests(unittest.TestCase):
         self.assertEqual(refs["commit"], "a03fbb4d175141f38a605698054191c834802d8a")
 
     def test_adapter_version_uses_codex_cachebuster(self) -> None:
-        self.assertEqual(adapter_version("v1.5.0", 2), "1.5.0+codex.adapter-2")
+        self.assertEqual(adapter_version("v1.5.0", 3), "1.5.0+codex.adapter-3")
 
     def test_generated_tree_matches_lock(self) -> None:
         self.assertEqual(tree_hash(self.plugin), self.lock["artifact"]["tree_sha256"])
@@ -52,7 +52,9 @@ class AdapterTests(unittest.TestCase):
     def test_all_skills_are_explicit_only(self) -> None:
         for skill in (self.plugin / "skills").iterdir():
             if skill.is_dir():
-                self.assertIn("allow_implicit_invocation: false", (skill / "agents/openai.yaml").read_text())
+                sidecar = (skill / "agents/openai.yaml").read_text()
+                self.assertIn("allow_implicit_invocation: false", sidecar)
+                self.assertIn(f"Use ${skill.name}", sidecar)
 
     def test_no_unported_slash_command_reference(self) -> None:
         for skill_file in (self.plugin / "skills").glob("*/SKILL.md"):
@@ -68,8 +70,15 @@ class AdapterTests(unittest.TestCase):
         self.assertFalse(actual & removed)
 
     def test_qwen_skills_are_native_and_explicit(self) -> None:
+        audit_fix = (self.plugin / "skills/qwen-audit-fix/SKILL.md").read_text()
         review = (self.plugin / "skills/qwen-review/SKILL.md").read_text()
         preflight = (self.plugin / "skills/qwen-preflight/SKILL.md").read_text()
+        self.assertIn("maximum Qwen calls", audit_fix)
+        self.assertIn(".cc-suite/audits/qwen-audit-fix-", audit_fix)
+        self.assertIn("Qwen output is a hypothesis, not proof.", audit_fix)
+        self.assertIn("Start a fresh Qwen review", audit_fix)
+        self.assertIn("every authorized batch", audit_fix)
+        self.assertIn("Run 1–3 fix/test/re-audit rounds", audit_fix)
         self.assertIn("Codex owns", review)
         self.assertIn("explicitly asks Qwen", review)
         self.assertIn("without sending a model prompt", preflight)

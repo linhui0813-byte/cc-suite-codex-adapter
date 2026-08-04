@@ -1,7 +1,7 @@
 # Adapter safety boundary: no imported skill runs implicitly.
 interface:
-  display_name: "Init"
+  display_name: "Qwen Audit Fix"
   short_description: "Explicit-only cc-suite workflow"
-  default_prompt: "Use $init for this explicit cc-suite workflow."
+  default_prompt: "Use $qwen-audit-fix for this explicit cc-suite workflow."
 policy:
   allow_implicit_invocation: false

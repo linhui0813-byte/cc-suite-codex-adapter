@@ -11,7 +11,7 @@ bounded Qwen review runtime. It is not a fork and does not modify upstream.
 official stable tag
   -> verify tag object + full commit
   -> download and SHA-256 the exact source archive
-  -> apply six native Codex skill overlays
+  -> apply seven native Codex skill overlays
   -> copy the exact allowlisted Qwen runtime dependency closure
   -> replace only the Claude-specific delegation boundary
   -> force every skill to explicit-only
@@ -27,15 +27,17 @@ The current pin is in `provenance.lock.json`. Generated output lives in
 
 The upstream release is a Claude Code plugin with several cross-runtime paths.
 Blind copying would carry Claude commands, agents, bridges, MCP assumptions,
-and hooks into Codex. This adapter packages six native, explicit-only skills
+and hooks into Codex. This adapter packages seven native, explicit-only skills
 and only the six files required by the bounded Qwen review runner.
 
-Qwen is optional and read-only. It never runs automatically, receives no files
-without explicit user authorization, and has no write-enabled mode. The runner
-uses Safe Mode, Plan mode, sandboxing, an empty MCP set, exact tool discovery,
-isolated file copies, bounded `read_file` calls, hash verification, and strict
-terminal-result validation. Codex remains the primary agent, editor, verifier,
-and final judge.
+Qwen is optional and read-only. It never runs without an explicit skill
+request, receives no files without explicit user authorization, and has no
+write-enabled mode. The runner uses Safe Mode, Plan mode, sandboxing, an empty
+MCP set, exact tool discovery, isolated file copies, bounded `read_file` calls,
+hash verification, and strict terminal-result validation.
+`$qwen-audit-fix` composes those calls into a durable audit, adjudication, fix,
+test, and re-audit loop. Codex remains the primary agent, only editor, evidence
+verifier, and final judge.
 
 ## Update and verify
 
@@ -79,9 +81,10 @@ codex plugin add cc-suite-codex@cc-suite-codex-adapter
 
 Start a new thread, select `$diagnose`, and verify its provenance report. Use
 `$qwen-preflight` for a zero-prompt local readiness check and `$qwen-review`
-only when you intentionally want to send a prompt or named files to Qwen. For
-an upgrade, sync and validate first, reinstall from the same marketplace, then
-start a new thread.
+only when you intentionally want a critique without edits. Use
+`$qwen-audit-fix` when you authorize exact files for repeated review while
+Codex fixes accepted findings and runs tests. For an upgrade, sync and validate
+first, reinstall from the same marketplace, then start a new thread.
 
 ## Intentionally not ported
 
