@@ -36,9 +36,9 @@ import {
 } from "./lib/qwen-stream.mjs";
 import { resolveWorkspaceRoot } from "./lib/workspace.mjs";
 
-const DEFAULT_JOB_TIMEOUT_MS = 15 * 60 * 1000;
-const DEFAULT_ATTEMPT_TIMEOUT_MS = 5 * 60 * 1000;
-const DEFAULT_IDLE_TIMEOUT_MS = 4 * 60 * 1000;
+const DEFAULT_JOB_TIMEOUT_MS = 20 * 60 * 1000;
+const DEFAULT_ATTEMPT_TIMEOUT_MS = 10 * 60 * 1000;
+const DEFAULT_IDLE_TIMEOUT_MS = 8 * 60 * 1000;
 const DEFAULT_MAX_RESUMES = 2;
 const HEARTBEAT_MS = 30 * 1000;
 const EXIT_GRACE_MS = 10 * 1000;
@@ -292,6 +292,7 @@ function buildQwenArgs(args, targets, resumeId, prompt, attemptTimeoutMs) {
     "--sandbox",
     "--approval-mode", "plan",
     "--output-format", "stream-json",
+    "--include-partial-messages",
     "--max-wall-time", `${Math.max(1, Math.ceil(attemptTimeoutMs / 1000))}s`,
     "--max-session-turns", "30",
     "--max-tool-calls", String(maxToolCalls),

@@ -1,6 +1,6 @@
 {
   "adapter_repository": "https://github.com/linhui0813-byte/cc-suite-codex-adapter",
-  "adapter_version": "1.5.0+codex.adapter-4",
+  "adapter_version": "1.5.0+codex.adapter-5",
   "archive_sha256": "fe4d8120d1874d6f361652de186decc5f223f7b4d93427853a3442a2bfba0e79",
   "commit": "a03fbb4d175141f38a605698054191c834802d8a",
   "plugin_name": "cc-suite-codex",
@@ -13,7 +13,7 @@
     },
     {
       "origin": "deterministic-transform",
-      "packaged_sha256": "ffaa40d884f12dc101121ff1f678424dc9fa536d07463c02fab8ba81d631d5cf",
+      "packaged_sha256": "2aad19c3ce441dda3627d79fbb91993ccbd46cbce6317b19e4ff2029cfbd5aa8",
       "path": "scripts/lib/qwen-stream.mjs",
       "upstream_sha256": "45390f2967cc152f23856908e31c328ed6fe6ec808f5852b905580a40fd34339"
     },
@@ -37,7 +37,7 @@
     },
     {
       "origin": "deterministic-transform",
-      "packaged_sha256": "27174aabe75a52aecf10b236ff3fdd3720bebbf503b8f40814e1df6e3021b0cc",
+      "packaged_sha256": "156af546be76d1a70ff9283901f5b04f1e74fe4c3b3bc8f0d19df6ca14bb6913",
       "path": "scripts/qwen-runner.mjs",
       "upstream_sha256": "23b16e8818644a44d378d0e00c066e988275e33b7f89ad2c3f24377d2e0c17c6"
     }

@@ -38,9 +38,9 @@ node <plugin-root>/scripts/qwen-runner.mjs
   [--model <model-id>]
   [--target <exact-workspace-file>]...
   --max-resumes 2
-  --attempt-timeout-ms 300000
-  --idle-timeout-ms 240000
-  --timeout-ms 900000
+  --attempt-timeout-ms 600000
+  --idle-timeout-ms 480000
+  --timeout-ms 1200000
   --summary <short-summary>
   -- <review-prompt>
 ```

@@ -73,6 +73,26 @@ if (mode === "timeout-resume" && !resumed) {
 } else if (mode === "signal-hang") {
   process.on("SIGTERM", () => {});
   setInterval(() => {}, 1000);
+} else if (mode === "partial-progress") {
+  let tick = 0;
+  const timer = setInterval(() => {
+    tick += 1;
+    emit({
+      type: "stream_event",
+      session_id: session,
+      parent_tool_use_id: null,
+      event: {
+        type: "content_block_delta",
+        index: 0,
+        delta: { type: "thinking_delta", thinking: "progress-" + tick },
+      },
+    });
+    if (tick === 5) {
+      clearInterval(timer);
+      emit({ type: "assistant", session_id: session, message: { content: [{ type: "text", text: "review" }] } });
+      emit({ type: "result", subtype: "success", session_id: session, is_error: false, result: "review" });
+    }
+  }, 200);
 } else {
   if (mode === "malformed") {
     process.stdout.write("{bad json\\n");
@@ -184,6 +204,7 @@ test("qwen runner enforces sandbox and built-in budgets at the CLI boundary", ()
     const args = JSON.parse(fs.readFileSync(run.argsFile, "utf8"));
     assert.ok(args.includes("--safe-mode"));
     assert.ok(args.includes("--sandbox"));
+    assert.ok(args.includes("--include-partial-messages"));
     assert.deepEqual(args.slice(args.indexOf("--approval-mode"), args.indexOf("--approval-mode") + 2), [
       "--approval-mode",
       "plan",
@@ -200,6 +221,22 @@ test("qwen runner enforces sandbox and built-in budgets at the CLI boundary", ()
     assert.equal(args[args.indexOf("--max-tool-calls") + 1], "4");
     assert.equal(args[args.indexOf("--max-session-turns") + 1], "30");
     assert.match(args[args.indexOf("--max-wall-time") + 1], /^\d+s$/);
+  } finally {
+    cleanupDir(run.dir);
+  }
+});
+
+test("partial assistant progress keeps a slow attempt alive", () => {
+  const run = runFake("partial-progress", [], {
+    maxResumes: 0,
+    attemptTimeoutMs: 3000,
+    idleTimeoutMs: 500,
+    timeoutMs: 3500,
+  });
+  try {
+    assert.equal(run.result.status, 0, JSON.stringify(run.output));
+    assert.equal(run.output.status, "completed");
+    assert.equal(run.output.attempts.length, 1);
   } finally {
     cleanupDir(run.dir);
   }

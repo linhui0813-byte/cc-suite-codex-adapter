@@ -339,6 +339,55 @@ test("a Qwen 0.21.4 goal_state stream event is accepted after init", () => {
   }
 });
 
+test("known Qwen partial progress events are accepted after init", () => {
+  const dir = makeTempDir("qwen-stream-");
+  try {
+    const state = createQwenStreamState({ cwd: dir });
+    consumeQwenEvent(state, initEvent());
+    for (const event of [
+      {
+        type: "message_start",
+        message: { role: "assistant", content: [] },
+      },
+      {
+        type: "content_block_start",
+        index: 0,
+        content_block: { type: "thinking", thinking: "", signature: "" },
+      },
+      {
+        type: "content_block_delta",
+        index: 0,
+        delta: { type: "thinking_delta", thinking: "checking" },
+      },
+      { type: "content_block_stop", index: 0 },
+      {
+        type: "content_block_start",
+        index: 1,
+        content_block: { type: "text", text: "" },
+      },
+      {
+        type: "content_block_delta",
+        index: 1,
+        delta: { type: "text_delta", text: "clean" },
+      },
+      { type: "content_block_stop", index: 1 },
+      { type: "message_stop" },
+    ]) {
+      consumeQwenEvent(state, {
+        type: "stream_event",
+        session_id: "session-1",
+        parent_tool_use_id: null,
+        event,
+      });
+    }
+    consumeQwenEvent(state, resultEvent());
+    assert.equal(state.result, "review complete");
+    assert.equal(state.events, 10);
+  } finally {
+    cleanupDir(dir);
+  }
+});
+
 test("stream events before init and unknown stream event types fail closed", () => {
   const dir = makeTempDir("qwen-stream-");
   try {
@@ -365,9 +414,25 @@ test("stream events before init and unknown stream event types fail closed", () 
       () => consumeQwenEvent(unknown, {
         type: "stream_event",
         session_id: "session-1",
-        event: { type: "content_block_delta", delta: { type: "tool_use" } },
+        event: { type: "future_progress", value: {} },
       }),
       (error) => error.code === "unsupported_stream_event"
+    );
+
+    const malformedDelta = createQwenStreamState({ cwd: dir });
+    consumeQwenEvent(malformedDelta, initEvent());
+    assert.throws(
+      () => consumeQwenEvent(malformedDelta, {
+        type: "stream_event",
+        session_id: "session-1",
+        parent_tool_use_id: null,
+        event: {
+          type: "content_block_delta",
+          index: 0,
+          delta: { type: "tool_use", name: "write_file" },
+        },
+      }),
+      (error) => error.code === "malformed_stream_event"
     );
   } finally {
     cleanupDir(dir);
