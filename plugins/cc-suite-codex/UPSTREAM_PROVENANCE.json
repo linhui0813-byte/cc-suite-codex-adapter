@@ -1,9 +1,10 @@
 {
   "adapter_repository": "https://github.com/linhui0813-byte/cc-suite-codex-adapter",
-  "adapter_version": "1.5.0+codex.adapter-5",
-  "archive_sha256": "fe4d8120d1874d6f361652de186decc5f223f7b4d93427853a3442a2bfba0e79",
-  "commit": "a03fbb4d175141f38a605698054191c834802d8a",
+  "adapter_version": "2.0.0+codex.adapter-6",
+  "archive_sha256": "02d8afe73207e3a50641eacfadc5ce9afd3ed1bc33bfef778930f080e278c65b",
+  "commit": "9fe95167c2b2aeec8e734c75c99768bf0886dd00",
   "plugin_name": "cc-suite-codex",
+  "ref": "refs/heads/main",
   "runtime_files": [
     {
       "origin": "adapter-overlay",
@@ -12,16 +13,22 @@
       "upstream_sha256": "20cf31e9ff987102cd900abe0d764e35609943a79d0d85d37a04f3d764411fe7"
     },
     {
+      "origin": "upstream",
+      "packaged_sha256": "88dc792e1d2c4030d0c7990df84ebf7cd6fd1609a384b519844f13434ba13597",
+      "path": "scripts/lib/process.mjs",
+      "upstream_sha256": "88dc792e1d2c4030d0c7990df84ebf7cd6fd1609a384b519844f13434ba13597"
+    },
+    {
       "origin": "deterministic-transform",
-      "packaged_sha256": "2aad19c3ce441dda3627d79fbb91993ccbd46cbce6317b19e4ff2029cfbd5aa8",
+      "packaged_sha256": "d223f08486a29149571c2b8dea4efff78f1533dd82390163a0a5f0f868f9b93a",
       "path": "scripts/lib/qwen-stream.mjs",
-      "upstream_sha256": "45390f2967cc152f23856908e31c328ed6fe6ec808f5852b905580a40fd34339"
+      "upstream_sha256": "904865bc0ad1b885f16b1bd29b9fe0636961d2bb4ffe8394be0538de10ac043f"
     },
     {
       "origin": "upstream",
-      "packaged_sha256": "7a943bd5c8b8df6439c00c68ad7cb87c3cdf55593d8fe6c7fb4e93fc088b8664",
+      "packaged_sha256": "2eacd7b6758182aaac9ea10472f35f74f724e8a20c516e28b77f568e2c3c9876",
       "path": "scripts/lib/state.mjs",
-      "upstream_sha256": "7a943bd5c8b8df6439c00c68ad7cb87c3cdf55593d8fe6c7fb4e93fc088b8664"
+      "upstream_sha256": "2eacd7b6758182aaac9ea10472f35f74f724e8a20c516e28b77f568e2c3c9876"
     },
     {
       "origin": "upstream",
@@ -31,18 +38,17 @@
     },
     {
       "origin": "upstream",
-      "packaged_sha256": "39ac9ad9cabf03ac3fd8c020313b457a0e39559b224ba83400ae10d3f557f2a3",
+      "packaged_sha256": "fb45f8c8a804b7c6609474737ba9bd8ed0acb8211e1a729480e815780fc424ae",
       "path": "scripts/qwen-preflight.sh",
-      "upstream_sha256": "39ac9ad9cabf03ac3fd8c020313b457a0e39559b224ba83400ae10d3f557f2a3"
+      "upstream_sha256": "fb45f8c8a804b7c6609474737ba9bd8ed0acb8211e1a729480e815780fc424ae"
     },
     {
       "origin": "deterministic-transform",
-      "packaged_sha256": "156af546be76d1a70ff9283901f5b04f1e74fe4c3b3bc8f0d19df6ca14bb6913",
+      "packaged_sha256": "2f288acb4a78837603badf04a17ded8786765bc2e773362321c1d64b2c41037a",
       "path": "scripts/qwen-runner.mjs",
-      "upstream_sha256": "23b16e8818644a44d378d0e00c066e988275e33b7f89ad2c3f24377d2e0c17c6"
+      "upstream_sha256": "78b72b4e9a3c53ae8e2c6bf73a42d23c0e6c255729235e6c9b0f35bffa06a8de"
     }
   ],
   "source": "https://github.com/xiaolai/cc-suite",
-  "tag": "v1.5.0",
-  "tag_object": "b0cca9f0c5cb2e83a057238058258ddb38e6e0da"
+  "version": "2.0.0"
 }

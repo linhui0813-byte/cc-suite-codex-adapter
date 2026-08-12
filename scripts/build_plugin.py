@@ -263,7 +263,7 @@ def build(source: Path, lock: dict) -> str:
                 "path": relative,
                 "upstream_sha256": sha256_bytes(upstream_bytes),
             })
-        version = adapter_version(lock["upstream"]["tag"], config["adapter_revision"])
+        version = adapter_version(lock["upstream"]["version"], config["adapter_revision"])
         manifest = {
             "author": {"name": "Independent cc-suite Codex adapter maintainers"},
             "description": "A Codex-native cc-suite adapter with bounded Qwen review and audit-fix workflows.",
@@ -298,9 +298,9 @@ def build(source: Path, lock: dict) -> str:
             "archive_sha256": lock["upstream"]["archive_sha256"],
             "commit": lock["upstream"]["commit"],
             "plugin_name": plugin_name,
+            "ref": lock["upstream"]["ref"],
             "source": lock["upstream"]["repository"],
-            "tag": lock["upstream"]["tag"],
-            "tag_object": lock["upstream"]["tag_object"],
+            "version": lock["upstream"]["version"],
             "runtime_files": runtime_provenance,
         }
         write_json(temp / "UPSTREAM_PROVENANCE.json", provenance)
@@ -332,7 +332,7 @@ def main() -> None:
     args = parser.parse_args()
     lock = __import__("json").loads((ROOT / "provenance.lock.json").read_text())
     with tempfile.TemporaryDirectory(prefix="cc-suite-source-") as temp:
-        source = extract_archive(args.archive, lock["upstream"]["tag"], Path(temp))
+        source = extract_archive(args.archive, lock["upstream"]["commit"], Path(temp))
         print(build(source, lock))
 
 

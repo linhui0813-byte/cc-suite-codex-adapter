@@ -10,7 +10,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "scripts"))
 
-from _lib import adapter_version, latest_stable, parse_ls_remote, tree_hash
+from _lib import adapter_version, package_release, package_version, parse_head, tree_hash
 
 
 class AdapterTests(unittest.TestCase):
@@ -18,22 +18,27 @@ class AdapterTests(unittest.TestCase):
         self.lock = json.loads((ROOT / "provenance.lock.json").read_text())
         self.plugin = ROOT / self.lock["artifact"]["plugin_path"]
 
-    def current_remote_text(self, commit: str | None = None) -> str:
-        upstream = self.lock["upstream"]
-        commit = commit or upstream["commit"]
-        return (
-            f"{upstream['tag_object']}\trefs/tags/{upstream['tag']}\n"
-            f"{commit}\trefs/tags/{upstream['tag']}^{{}}\n"
-        )
+    def write_package(self, path: Path, version: str) -> None:
+        path.write_text(json.dumps({"name": "cc-suite", "version": version}), encoding="utf-8")
 
-    def test_stable_tag_discovery_ignores_prereleases(self) -> None:
-        tags = parse_ls_remote((ROOT / "tests/fixtures/ls-remote.txt").read_text())
-        tag, refs = latest_stable(tags)
-        self.assertEqual(tag, "v1.5.0")
-        self.assertEqual(refs["commit"], "a03fbb4d175141f38a605698054191c834802d8a")
+    def test_main_discovery_requires_a_full_commit(self) -> None:
+        commit = "a03fbb4d175141f38a605698054191c834802d8a"
+        self.assertEqual(parse_head(f"{commit}\trefs/heads/main\n"), commit)
+        with self.assertRaises(ValueError):
+            parse_head("a03fbb4\trefs/heads/main\n")
+
+    def test_package_version_requires_cc_suite_semver(self) -> None:
+        self.assertEqual(package_version('{"name":"cc-suite","version":"2.0.0"}'), "2.0.0")
+        with self.assertRaises(ValueError):
+            package_version('{"name":"other","version":"2.0.0"}')
+        with self.assertRaises(ValueError):
+            package_version('{"name":"cc-suite","version":"next"}')
+        with self.assertRaises(ValueError):
+            package_release("a03fbb4", '{"name":"cc-suite","version":"2.0.0"}')
 
     def test_adapter_version_uses_codex_cachebuster(self) -> None:
-        self.assertEqual(adapter_version("v1.5.0", 4), "1.5.0+codex.adapter-4")
+        self.assertEqual(adapter_version("2.0.0", 6), "2.0.0+codex.adapter-6")
+        self.assertEqual(adapter_version("2.0.0+build.1", 6), "2.0.0+build.1.codex.adapter-6")
 
     def test_generated_tree_matches_lock(self) -> None:
         self.assertEqual(tree_hash(self.plugin), self.lock["artifact"]["tree_sha256"])
@@ -98,28 +103,38 @@ class AdapterTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
 
     def test_dry_run_update_check(self) -> None:
+        upstream = self.lock["upstream"]
         with tempfile.TemporaryDirectory() as temp:
-            path = Path(temp) / "current.txt"
-            path.write_text(self.current_remote_text())
+            path = Path(temp) / "package.json"
+            self.write_package(path, upstream["version"])
+            changed_commit = "f" * 40 if upstream["commit"] != "f" * 40 else "e" * 40
             result = subprocess.run(
-                [sys.executable, "scripts/check_update.py", "--remote-file", str(path)],
+                [
+                    sys.executable, "scripts/check_update.py",
+                    "--package-file", str(path),
+                    "--commit", changed_commit,
+                ],
                 cwd=ROOT, check=True, text=True, capture_output=True,
             )
         payload = json.loads(result.stdout)
         self.assertFalse(payload["update_available"])
-        self.assertFalse(payload["pinned_tag_moved"])
+        self.assertTrue(payload["source_commit_changed"])
 
-    def test_update_check_fails_closed_if_pinned_tag_moves(self) -> None:
-        fixture = self.current_remote_text("ffffffffffffffffffffffffffffffffffffffff")
+    def test_update_check_uses_package_version_as_signal(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
-            path = Path(temp) / "moved.txt"
-            path.write_text(fixture)
+            path = Path(temp) / "package.json"
+            self.write_package(path, "99.0.0")
             result = subprocess.run(
-                [sys.executable, "scripts/check_update.py", "--remote-file", str(path)],
-                cwd=ROOT, text=True, capture_output=True,
+                [
+                    sys.executable, "scripts/check_update.py",
+                    "--package-file", str(path),
+                    "--commit", "f" * 40,
+                ],
+                cwd=ROOT, check=True, text=True, capture_output=True,
             )
-        self.assertEqual(result.returncode, 2)
-        self.assertTrue(json.loads(result.stdout)["pinned_tag_moved"])
+        payload = json.loads(result.stdout)
+        self.assertTrue(payload["update_available"])
+        self.assertEqual(payload["latest_version"], "99.0.0")
 
     def test_validator_passes(self) -> None:
         result = subprocess.run(

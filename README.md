@@ -1,16 +1,17 @@
 # cc-suite Codex adapter
 
 This is an independent Codex adapter for the official
-[`xiaolai/cc-suite`](https://github.com/xiaolai/cc-suite). It tracks an immutable
-stable release tag, applies native Codex overlays, and packages the upstream
-bounded Qwen review runtime. It is not a fork and does not modify upstream.
+[`xiaolai/cc-suite`](https://github.com/xiaolai/cc-suite). It watches the
+version in upstream `package.json`, pins the exact `main` commit for each new
+version, applies native Codex overlays, and packages the upstream bounded Qwen
+review runtime. It is not a fork and does not modify upstream.
 
 ## Architecture
 
 ```text
-official stable tag
-  -> verify tag object + full commit
-  -> download and SHA-256 the exact source archive
+upstream package.json version on main
+  -> resolve and pin the exact full commit
+  -> download and SHA-256 that commit's source archive
   -> apply seven native Codex skill overlays
   -> copy the exact allowlisted Qwen runtime dependency closure
   -> replace only the Claude-specific delegation boundary
@@ -28,7 +29,7 @@ The current pin is in `provenance.lock.json`. Generated output lives in
 The upstream release is a Claude Code plugin with several cross-runtime paths.
 Blind copying would carry Claude commands, agents, bridges, MCP assumptions,
 and hooks into Codex. This adapter packages seven native, explicit-only skills
-and only the six files required by the bounded Qwen review runner.
+and only the seven files required by the bounded Qwen review runner.
 
 Qwen is optional and read-only. It never runs without an explicit skill
 request, receives no files without explicit user authorization, and has no
@@ -47,7 +48,8 @@ Check without changing files:
 python3 scripts/check_update.py
 ```
 
-Sync the latest stable release, rebuild, and update the lock:
+Sync the package version at the current upstream `main` commit, rebuild, and
+update the lock:
 
 ```bash
 python3 scripts/sync_upstream.py
@@ -62,12 +64,13 @@ python3 ~/.codex/skills/.system/plugin-creator/scripts/validate_plugin.py \
   plugins/cc-suite-codex
 ```
 
-The lock records the upstream tag, annotated-tag object, peeled commit, archive
-SHA-256, ISC license SHA-256, adapter version, sync time, and generated tree
-hash. The update check fails closed if the pinned tag disappears or moves. A
-new candidate is never activated automatically. The write-enabled update job
-does not execute newly imported upstream JavaScript; full runtime tests run in
-a separate CI workflow with read-only repository permission.
+The lock records the upstream package version, source ref, exact commit,
+archive SHA-256, ISC license SHA-256, adapter version, sync time, and generated
+tree hash. Commit-only changes do not trigger an update until upstream changes
+its `package.json` version. Every candidate remains pinned to one immutable
+commit and is never activated automatically. The write-enabled update job does
+not execute newly imported upstream JavaScript; full runtime tests run in a
+separate CI workflow with read-only repository permission.
 
 ## Local install after review
 
