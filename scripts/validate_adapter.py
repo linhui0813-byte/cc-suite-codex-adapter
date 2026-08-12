@@ -5,7 +5,7 @@ import json
 import re
 import sys
 
-from _lib import ROOT, adapter_version, load_config, sha256_file, tree_hash
+from _lib import ROOT, UPSTREAM_REF, adapter_version, load_config, sha256_file, tree_hash
 
 SHA = re.compile(r"^[0-9a-f]{40}$")
 SHA256 = re.compile(r"^[0-9a-f]{64}$")
@@ -37,11 +37,14 @@ def main() -> int:
     marketplace = json.loads((ROOT / ".agents/plugins/marketplace.json").read_text())
     provenance = json.loads((plugin / "UPSTREAM_PROVENANCE.json").read_text())
 
-    check(lock.get("schema_version") == 1, "lock schema_version must be 1")
+    check(lock.get("schema_version") == 2, "lock schema_version must be 2")
     check(SHA.fullmatch(lock["upstream"]["commit"]) is not None, "commit must be a full SHA")
-    check(SHA.fullmatch(lock["upstream"]["tag_object"]) is not None, "tag object must be a full SHA")
+    check(lock["upstream"].get("ref") == UPSTREAM_REF, "upstream ref must be main")
+    check(lock["upstream"].get("package_path") == "package.json", "upstream package path mismatch")
+    check(SEMVER.fullmatch(lock["upstream"].get("version", "")) is not None, "upstream version is not semver")
     check(SHA256.fullmatch(lock["upstream"]["archive_sha256"]) is not None, "archive hash must be SHA-256")
-    expected_version = adapter_version(lock["upstream"]["tag"], config["adapter_revision"])
+    check(lock["upstream"]["commit"] in lock["upstream"].get("archive_url", ""), "archive URL is not commit-pinned")
+    expected_version = adapter_version(lock["upstream"]["version"], config["adapter_revision"])
     check(lock["adapter"]["version"] == expected_version, "adapter version mismatch")
     check(lock["adapter"].get("repository") == config["adapter_repository"], "adapter repository lock mismatch")
     check(lock["adapter"].get("runtime_files") == config["runtime_files"], "runtime lock mismatch")
@@ -60,6 +63,8 @@ def main() -> int:
     check(provenance["commit"] == lock["upstream"]["commit"], "plugin provenance commit mismatch")
     check(provenance.get("adapter_repository") == config["adapter_repository"], "plugin adapter repository mismatch")
     check(provenance["archive_sha256"] == lock["upstream"]["archive_sha256"], "plugin provenance archive mismatch")
+    check(provenance.get("ref") == lock["upstream"]["ref"], "plugin provenance ref mismatch")
+    check(provenance.get("version") == lock["upstream"]["version"], "plugin provenance version mismatch")
     check(sha256_file(plugin / "LICENSE") == lock["upstream"]["license_sha256"], "packaged license hash mismatch")
     check(tree_hash(plugin) == lock["artifact"]["tree_sha256"], "generated tree hash mismatch")
 

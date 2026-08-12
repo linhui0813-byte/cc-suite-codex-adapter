@@ -1,7 +1,7 @@
 # Porting decisions
 
-The exact official `xiaolai/cc-suite` source release is recorded in
-`provenance.lock.json`.
+The exact official `xiaolai/cc-suite` package version and source commit are
+recorded in `provenance.lock.json`.
 
 | Upstream component | Adapter decision | Reason |
 |---|---|---|

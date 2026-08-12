@@ -1,5 +1,5 @@
 schema_version = 1
-adapter_revision = 5
+adapter_revision = 6
 plugin_name = "cc-suite-codex"
 marketplace_name = "cc-suite-codex-adapter"
 adapter_repository = "https://github.com/linhui0813-byte/cc-suite-codex-adapter"
@@ -26,6 +26,7 @@ overlay_skills = [
 
 runtime_files = [
   "scripts/lib/delegation-boundary.mjs",
+  "scripts/lib/process.mjs",
   "scripts/lib/qwen-stream.mjs",
   "scripts/lib/state.mjs",
   "scripts/lib/workspace.mjs",

@@ -14,12 +14,12 @@ version: 1.0.0
 Use the installed skill path shown in Codex's skill catalog to locate this
 `SKILL.md`. The plugin root is three parent directories above this file. Read
 `UPSTREAM_PROVENANCE.json` there and verify that `plugin_name` is
-`cc-suite-codex` and that the recorded tag, commit, and archive hash are
-non-empty.
+`cc-suite-codex` and that the recorded package version, source ref, commit, and
+archive hash are non-empty.
 
 ## 2. Verify the packaged Qwen runtime
 
-Confirm that `scripts/qwen-preflight.sh`, `scripts/qwen-runner.mjs`, and the four
+Confirm that `scripts/qwen-preflight.sh`, `scripts/qwen-runner.mjs`, and the five
 declared files under `scripts/lib/` exist beneath the same plugin root. Run the
 preflight script and parse its single JSON result. Preflight checks only the
 local Qwen version and sandbox provider; it does not send a prompt or test

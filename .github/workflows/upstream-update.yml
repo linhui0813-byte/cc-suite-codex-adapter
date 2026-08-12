@@ -20,12 +20,12 @@ jobs:
         with:
           python-version: "3.12"
       - id: check
-        name: Check latest stable tag without changing files
+        name: Check upstream package.json version without changing files
         run: |
           python3 scripts/check_update.py > update-check.json
           python3 -c 'import json; p=json.load(open("update-check.json")); print("available=" + str(p["update_available"]).lower())' >> "$GITHUB_OUTPUT"
       - if: steps.check.outputs.available == 'true'
-        name: Sync exact tag and build candidate
+        name: Sync exact commit and build candidate
         run: python3 scripts/sync_upstream.py
       - if: steps.check.outputs.available == 'true'
         name: Statically validate candidate before any branch write
@@ -40,17 +40,18 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          TAG=$(python3 -c 'import json; print(json.load(open("provenance.lock.json"))["upstream"]["tag"])')
-          BRANCH="automation/cc-suite-${TAG}"
-          OPEN_PRS=$(gh pr list --head "$BRANCH" --state open --json number --jq length)
-          if [ "$OPEN_PRS" -gt 0 ]; then
-            echo "An open update PR already exists for ${TAG}; leaving it unchanged."
+          VERSION=$(python3 -c 'import json; print(json.load(open("provenance.lock.json"))["upstream"]["version"])')
+          COMMIT=$(python3 -c 'import json; print(json.load(open("provenance.lock.json"))["upstream"]["commit"])')
+          BRANCH="automation/cc-suite-v${VERSION}-${COMMIT:0:12}"
+          EXISTING_PRS=$(gh pr list --head "$BRANCH" --state all --json number --jq length)
+          if [ "$EXISTING_PRS" -gt 0 ]; then
+            echo "An update PR already exists for ${VERSION} at ${COMMIT}; leaving it unchanged."
             exit 0
           fi
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git switch -c "$BRANCH"
           git add provenance.lock.json plugins .agents/plugins/marketplace.json
-          git commit -m "chore: prepare cc-suite ${TAG} adapter update"
+          git commit -m "chore: prepare cc-suite ${VERSION} adapter update"
           git push --set-upstream origin "$BRANCH"
-          gh pr create --base "$GITHUB_REF_NAME" --head "$BRANCH" --title "chore: update adapter to cc-suite ${TAG}" --body "Automated candidate only. Review provenance and tests before merge or activation."
+          gh pr create --base "$GITHUB_REF_NAME" --head "$BRANCH" --title "chore: update adapter to cc-suite ${VERSION}" --body "Automated candidate only. The package.json version selected this update; provenance pins the exact upstream commit and archive hash. Review provenance and tests before merge or activation."
