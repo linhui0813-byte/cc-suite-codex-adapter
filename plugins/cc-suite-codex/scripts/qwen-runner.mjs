@@ -7,7 +7,8 @@
 //   node qwen-runner.mjs [--model <model>] [--target <file>]...
 //     [--max-resumes <0..5>]
 //     [--attempt-timeout-ms <ms>] [--idle-timeout-ms <ms>]
-//     [--timeout-ms <ms>] [--debug-capture] [--background]
+//     [--timeout-ms <ms>] [--result-format text|json-object]
+//     [--debug-capture] [--background]
 //     [--session-id <id>] [--summary <text>] -- <review prompt>
 
 import fs from "node:fs";
@@ -47,6 +48,7 @@ const HEARTBEAT_MS = 30 * 1000;
 const EXIT_GRACE_MS = 10 * 1000;
 const SIGKILL_GRACE_MS = 5 * 1000;
 const MAX_RESUMES_LIMIT = 5;
+const RESULT_FORMATS = new Set(["text", "json-object"]);
 
 // Qwen 0.21.0 through 0.21.2 ignore --core-tools in Safe Mode. Deny every known
 // non-review tool explicitly, then verify the actual init tool list before
@@ -147,6 +149,13 @@ const AUTO_RESUME_PROMPT = [
   "Return the final review directly.",
 ].join(" ");
 
+const JSON_FORMAT_REPAIR_PROMPT = [
+  "Your previous result was rejected only because it was not exactly one JSON object.",
+  "Do not repeat the analysis or call any tool.",
+  "Restate the same review as exactly one valid JSON object, with no Markdown fence and no prose before or after it.",
+  "Preserve the meaning and every finding; do not add, remove, or change findings.",
+].join(" ");
+
 function parseIntegerFlag(flag, value, minimum, maximum = Number.MAX_SAFE_INTEGER) {
   if (!/^\d+$/.test(value)) {
     throw new QwenStreamError("invalid_arguments", `${flag} must be a decimal integer`);
@@ -178,6 +187,7 @@ function parseArgs(argv) {
     attemptTimeoutMs: DEFAULT_ATTEMPT_TIMEOUT_MS,
     idleTimeoutMs: DEFAULT_IDLE_TIMEOUT_MS,
     timeoutMs: DEFAULT_JOB_TIMEOUT_MS,
+    resultFormat: "text",
     debugCapture: false,
     background: false,
     sessionId: null,
@@ -222,6 +232,18 @@ function parseArgs(argv) {
         args.timeoutMs = parseIntegerFlag(arg, optionValue(argv, i, arg), 1);
         i += 2;
         continue;
+      case "--result-format": {
+        const value = optionValue(argv, i, arg);
+        if (!RESULT_FORMATS.has(value)) {
+          throw new QwenStreamError(
+            "invalid_arguments",
+            `${arg} must be one of: ${[...RESULT_FORMATS].join(", ")}`
+          );
+        }
+        args.resultFormat = value;
+        i += 2;
+        continue;
+      }
       case "--debug-capture":
         args.debugCapture = true;
         i += 1;
@@ -282,9 +304,33 @@ function reviewPolicyPrompt(targets) {
   ].join(" ");
 }
 
-function boundedPrompt(prompt, targets) {
+function resultFormatPrompt(resultFormat) {
+  if (resultFormat !== "json-object") return "";
+  return [
+    "Your final result must be exactly one valid JSON object.",
+    "Do not include Markdown fences or any prose before or after the object.",
+  ].join(" ");
+}
+
+function normalizeJsonObjectResult(rawOutput) {
+  const trimmed = rawOutput.trim();
+  const fenced = trimmed.match(/^```(?:json)?[ \t]*\r?\n([\s\S]*?)\r?\n```$/i);
+  const candidate = fenced ? fenced[1].trim() : trimmed;
+  let parsed;
+  try {
+    parsed = JSON.parse(candidate);
+  } catch {
+    return { ok: false, error: "Qwen result was not exactly one valid JSON object" };
+  }
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+    return { ok: false, error: "Qwen result JSON must be an object" };
+  }
+  return { ok: true, value: JSON.stringify(parsed) };
+}
+
+function boundedPrompt(prompt, targets, resultFormat) {
   return withDelegationBoundary(
-    `${reviewPolicyPrompt(targets)} The calling agent retains final judgment; your output is critique, not evidence.\n\n${prompt}`
+    `${reviewPolicyPrompt(targets)} The calling agent retains final judgment; your output is critique, not evidence. ${resultFormatPrompt(resultFormat)}\n\n${prompt}`
   );
 }
 
@@ -303,7 +349,7 @@ function buildQwenArgs(args, targets, resumeId, prompt, attemptTimeoutMs) {
   ];
   if (args.model) qwenArgs.push("--model", args.model);
   if (resumeId) qwenArgs.push("--resume", resumeId);
-  qwenArgs.push("--prompt", boundedPrompt(prompt, targets));
+  qwenArgs.push("--prompt", boundedPrompt(prompt, targets, args.resultFormat));
   return qwenArgs;
 }
 
@@ -690,6 +736,7 @@ async function executeQwen(cwd, args, targets, integrityTargets, logFile) {
   const jobStarted = Date.now();
   let resumeId = null;
   let prompt = args.prompt;
+  let formatRepairActive = false;
   const attempts = [];
 
   for (let index = 0; index <= args.maxResumes; index += 1) {
@@ -709,7 +756,7 @@ async function executeQwen(cwd, args, targets, integrityTargets, logFile) {
     const result = await executeQwenAttempt(
       cwd,
       args,
-      targets,
+      formatRepairActive ? [] : targets,
       logFile,
       attempt,
       resumeId,
@@ -718,6 +765,7 @@ async function executeQwen(cwd, args, targets, integrityTargets, logFile) {
     );
     attempts.push({
       attempt,
+      purpose: formatRepairActive ? "format-repair" : "review",
       outcome: result.outcome,
       errorCode: result.errorCode ?? null,
       sessionId: result.sessionId,
@@ -756,6 +804,39 @@ async function executeQwen(cwd, args, targets, integrityTargets, logFile) {
     }
 
     if (result.outcome === "completed") {
+      if (args.resultFormat === "json-object") {
+        const normalized = normalizeJsonObjectResult(result.rawOutput);
+        if (!normalized.ok) {
+          attempts.at(-1).outcome = "incomplete";
+          attempts.at(-1).errorCode = "invalid_result_format";
+          appendLog(logFile, `Attempt ${attempt}: invalid_result_format`);
+          if (formatRepairActive || !result.sessionId || index >= args.maxResumes) {
+            return {
+              status: "failed",
+              errorCode: "invalid_result_format",
+              errorMessage: formatRepairActive
+                ? `Qwen format repair failed: ${normalized.error}`
+                : `${normalized.error}; no format-repair attempt was available`,
+              sessionId: result.sessionId,
+              rawOutput: result.rawOutput,
+              attempts,
+            };
+          }
+          formatRepairActive = true;
+          resumeId = result.sessionId;
+          prompt = JSON_FORMAT_REPAIR_PROMPT;
+          appendLog(logFile, `Attempt ${attempt}: requesting one tool-free same-session format repair`);
+          continue;
+        }
+        appendLog(logFile, `Attempt ${attempt}: completed with a verified JSON-object result and unchanged targets`);
+        return {
+          status: "completed",
+          sessionId: result.sessionId,
+          rawOutput: normalized.value,
+          usage: result.usage ?? null,
+          attempts,
+        };
+      }
       appendLog(logFile, `Attempt ${attempt}: completed with verified terminal result and unchanged targets`);
       return {
         status: "completed",
@@ -777,6 +858,16 @@ async function executeQwen(cwd, args, targets, integrityTargets, logFile) {
     }
 
     resumeId = result.sessionId;
+    if (formatRepairActive) {
+      return {
+        status: "stalled",
+        errorCode: result.errorCode || "format_repair_incomplete",
+        errorMessage: `${result.errorMessage}; the one format-repair attempt did not complete`,
+        sessionId: resumeId || null,
+        rawOutput: "",
+        attempts,
+      };
+    }
     if (!resumeId || index >= args.maxResumes) {
       return {
         status: "stalled",
@@ -923,6 +1014,7 @@ function childArgs(args) {
     "--attempt-timeout-ms", String(args.attemptTimeoutMs),
     "--idle-timeout-ms", String(args.idleTimeoutMs),
     "--timeout-ms", String(args.timeoutMs),
+    "--result-format", args.resultFormat,
   ];
   if (args.sessionId) argv.push("--session-id", args.sessionId);
   if (args.summary) argv.push("--summary", args.summary);

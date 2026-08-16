@@ -37,8 +37,8 @@ class AdapterTests(unittest.TestCase):
             package_release("a03fbb4", '{"name":"cc-suite","version":"2.0.0"}')
 
     def test_adapter_version_uses_codex_cachebuster(self) -> None:
-        self.assertEqual(adapter_version("2.0.0", 6), "2.0.0+codex.adapter-6")
-        self.assertEqual(adapter_version("2.0.0+build.1", 6), "2.0.0+build.1.codex.adapter-6")
+        self.assertEqual(adapter_version("2.0.0", 7), "2.0.0+codex.adapter-7")
+        self.assertEqual(adapter_version("2.0.0+build.1", 7), "2.0.0+build.1.codex.adapter-7")
 
     def test_generated_tree_matches_lock(self) -> None:
         self.assertEqual(tree_hash(self.plugin), self.lock["artifact"]["tree_sha256"])
@@ -84,6 +84,7 @@ class AdapterTests(unittest.TestCase):
         self.assertIn("Start a fresh Qwen review", audit_fix)
         self.assertIn("every authorized batch", audit_fix)
         self.assertIn("Run 1–3 fix/test/re-audit rounds", audit_fix)
+        self.assertIn("--result-format json-object", audit_fix)
         self.assertIn("Codex owns", review)
         self.assertIn("explicitly asks Qwen", review)
         self.assertIn("without sending a model prompt", preflight)

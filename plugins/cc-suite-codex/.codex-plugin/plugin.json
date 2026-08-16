@@ -31,5 +31,5 @@
   "name": "cc-suite-codex",
   "repository": "https://github.com/linhui0813-byte/cc-suite-codex-adapter",
   "skills": "./skills/",
-  "version": "2.0.0+codex.adapter-6"
+  "version": "2.0.0+codex.adapter-7"
 }
