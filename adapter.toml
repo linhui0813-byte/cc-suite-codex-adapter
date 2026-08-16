@@ -1,5 +1,5 @@
 schema_version = 1
-adapter_revision = 6
+adapter_revision = 7
 plugin_name = "cc-suite-codex"
 marketplace_name = "cc-suite-codex-adapter"
 adapter_repository = "https://github.com/linhui0813-byte/cc-suite-codex-adapter"

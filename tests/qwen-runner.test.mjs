@@ -14,6 +14,11 @@ const PLUGIN_ROOT = path.resolve(
 );
 const RUNNER = path.join(PLUGIN_ROOT, "scripts", "qwen-runner.mjs");
 const PREFLIGHT = path.join(PLUGIN_ROOT, "scripts", "qwen-preflight.sh");
+const VALID_JSON_RESULT = JSON.stringify({
+  result: "clean",
+  reviewed_prior: [],
+  new_findings: [],
+});
 
 const FAKE_QWEN = `#!/usr/bin/env node
 const fs = require("node:fs");
@@ -26,6 +31,7 @@ if (args.includes("--version")) {
   process.exit(0);
 }
 const mode = process.env.FAKE_QWEN_MODE || "normal";
+const validJson = ${JSON.stringify(VALID_JSON_RESULT)};
 function findTarget(root) {
   for (const entry of fs.readdirSync(root, { withFileTypes: true })) {
     const candidate = require("node:path").join(root, entry.name);
@@ -118,7 +124,18 @@ if (mode === "timeout-resume" && !resumed) {
     fs.chmodSync(target, 0o600);
     fs.appendFileSync(target, "changed\\n");
   }
-  emit({ type: "assistant", session_id: session, message: { content: [{ type: "text", text: resumed ? "resumed review" : "review" }] } });
+  let resultText = resumed ? "resumed review" : "review";
+  const fence = String.fromCharCode(96).repeat(3);
+  if (mode === "json-raw") resultText = validJson;
+  if (mode === "json-fenced") resultText = fence + "json\\n" + validJson + "\\n" + fence;
+  if (mode === "mixed-json") {
+    resultText = resumed ? validJson : "Here is the requested result.\\n\\n" + fence + "json\\n" + validJson + "\\n" + fence;
+  }
+  if (mode === "mixed-json-bad-repair") {
+    resultText = "Still wrapped.\\n\\n" + fence + "json\\n" + validJson + "\\n" + fence;
+  }
+  if (mode === "json-array") resultText = "[]";
+  emit({ type: "assistant", session_id: session, message: { content: [{ type: "text", text: resultText }] } });
   if (mode === "terminal-error") {
     emit({ type: "result", subtype: "error", session_id: session, is_error: true, result: "provider failed" });
     process.exit(0);
@@ -127,7 +144,7 @@ if (mode === "timeout-resume" && !resumed) {
     emit({ type: "result", subtype: "success", session_id: session, is_error: false, result: "" });
     process.exit(0);
   }
-  emit({ type: "result", subtype: "success", session_id: session, is_error: false, result: resumed ? "resumed review" : "review" });
+  emit({ type: "result", subtype: "success", session_id: session, is_error: false, result: resultText });
   if (mode === "exit-mismatch") process.exitCode = 1;
 }
 `;
@@ -251,6 +268,90 @@ test("prompt-only review gives Qwen a zero tool-call budget", () => {
     assert.equal(args.includes("--core-tools"), false);
     const excluded = args[args.indexOf("--exclude-tools") + 1].split(",");
     assert.ok(excluded.includes("read_file"));
+  } finally {
+    cleanupDir(run.dir);
+  }
+});
+
+test("json-object result format accepts and normalizes a raw object", () => {
+  const run = runFake("json-raw", ["--result-format", "json-object"]);
+  try {
+    assert.equal(run.result.status, 0, JSON.stringify(run.output));
+    assert.equal(run.output.status, "completed");
+    assert.equal(run.output.rawOutput, VALID_JSON_RESULT);
+    assert.equal(run.output.attempts.length, 1);
+    assert.equal(run.output.attempts[0].purpose, "review");
+  } finally {
+    cleanupDir(run.dir);
+  }
+});
+
+test("json-object result format accepts one outer JSON fence", () => {
+  const run = runFake("json-fenced", ["--result-format", "json-object"]);
+  try {
+    assert.equal(run.result.status, 0, JSON.stringify(run.output));
+    assert.equal(run.output.status, "completed");
+    assert.equal(run.output.rawOutput, VALID_JSON_RESULT);
+    assert.equal(run.output.attempts.length, 1);
+  } finally {
+    cleanupDir(run.dir);
+  }
+});
+
+test("mixed prose is not extracted and gets one tool-free format repair", () => {
+  const run = runFake(
+    "mixed-json",
+    ["--target", "draft.md", "--result-format", "json-object"],
+    { maxResumes: 1 }
+  );
+  try {
+    assert.equal(run.result.status, 0, JSON.stringify(run.output));
+    assert.equal(run.output.status, "completed");
+    assert.equal(run.output.rawOutput, VALID_JSON_RESULT);
+    assert.equal(run.output.attempts.length, 2);
+    assert.equal(run.output.attempts[0].outcome, "incomplete");
+    assert.equal(run.output.attempts[0].errorCode, "invalid_result_format");
+    assert.equal(run.output.attempts[1].purpose, "format-repair");
+    assert.deepEqual(run.output.attempts[1].toolCalls, []);
+
+    const args = JSON.parse(fs.readFileSync(run.argsFile, "utf8"));
+    assert.ok(args.includes("--resume"));
+    assert.equal(args[args.indexOf("--max-tool-calls") + 1], "0");
+    assert.ok(args[args.indexOf("--exclude-tools") + 1].split(",").includes("read_file"));
+    assert.match(args[args.indexOf("--prompt") + 1], /Restate the same review/);
+  } finally {
+    cleanupDir(run.dir);
+  }
+});
+
+test("a second mixed-prose result fails closed after one format repair", () => {
+  const run = runFake(
+    "mixed-json-bad-repair",
+    ["--result-format", "json-object"],
+    { maxResumes: 2 }
+  );
+  try {
+    assert.notEqual(run.result.status, 0);
+    assert.equal(run.output.status, "failed");
+    assert.equal(run.output.errorCode, "invalid_result_format");
+    assert.equal(run.output.targetsVerified, false);
+    assert.equal(run.output.attempts.length, 2);
+    assert.equal(run.output.attempts[1].purpose, "format-repair");
+  } finally {
+    cleanupDir(run.dir);
+  }
+});
+
+test("json-object result format rejects arrays", () => {
+  const run = runFake(
+    "json-array",
+    ["--result-format", "json-object"],
+    { maxResumes: 0 }
+  );
+  try {
+    assert.notEqual(run.result.status, 0);
+    assert.equal(run.output.status, "failed");
+    assert.equal(run.output.errorCode, "invalid_result_format");
   } finally {
     cleanupDir(run.dir);
   }

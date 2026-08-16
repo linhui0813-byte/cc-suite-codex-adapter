@@ -94,6 +94,7 @@ def main() -> int:
             "Start a fresh Qwen review",
             "every authorized batch",
             "Run 1–3 fix/test/re-audit rounds",
+            "--result-format json-object",
         ):
             check(marker in audit_text, f"qwen-audit-fix missing workflow marker: {marker}")
 
@@ -133,6 +134,8 @@ def main() -> int:
         '"--max-tool-calls"',
         'verifyReviewTargets',
         'stageReviewTargets',
+        'invalid_result_format',
+        'format-repair',
     ):
         check(marker in runner_text, f"qwen runner missing safety marker: {marker}")
     for marker in (

@@ -44,6 +44,10 @@ limit, and maximum Qwen calls:
 maximum Qwen calls = batch count × (1 initial audit + maximum fix rounds)
 ```
 
+Here, one Qwen call means one bounded review job. A job may use up to three
+visible attempts because `--max-resumes 2` also covers incomplete terminal
+output and one same-session JSON format repair.
+
 Proceed without another question only when the user explicitly invoked this
 skill on every exact target file. Otherwise obtain confirmation of the target
 list and maximum call count.
@@ -87,13 +91,19 @@ node <plugin-root>/scripts/qwen-runner.mjs
   --attempt-timeout-ms 600000
   --idle-timeout-ms 480000
   --timeout-ms 1200000
+  --result-format json-object
   --summary "qwen audit-fix initial batch N"
   -- <audit-prompt>
 ```
 
 Pass arguments as separate shell arguments. Keep background and debug capture
 disabled. Accept the wrapper result only when `status` is `completed`,
-`targetsVerified` is true, and `rawOutput` is non-empty.
+`targetsVerified` is true, and `rawOutput` is non-empty. With
+`--result-format json-object`, the runner accepts only a whole JSON object or
+one outer JSON code fence. It never extracts JSON from mixed prose. When Qwen
+wraps an otherwise valid result in prose, the runner may use one of the two
+declared resume attempts to request a tool-free, same-session restatement; the
+attempt remains visible in the wrapper result.
 
 Build the audit prompt in this order:
 
@@ -144,10 +154,11 @@ Require this Qwen output shape:
 
 Allow `result` values `clean` or `findings`, and severity values `critical`,
 `high`, `medium`, or `low`; the `_or_` strings above describe alternatives.
-Strip one outer `json` code fence if present, then parse the whole remaining
-value as JSON. Validate every path against the current batch, every line against
-the current file, and every required string as non-empty. On invalid output,
-record `invalid_review_output` and stop without silently spending another call.
+Parse the whole runner value as JSON. Validate every path against the current
+batch, every line against the current file, and every required string as
+non-empty. If the runner returns `invalid_result_format`, or the valid JSON
+object fails this schema, record `invalid_review_output` and stop. Never extract
+an object from mixed prose or launch a manual retry outside the declared job.
 
 Merge valid findings across batches, deduplicate the same mechanism at the same
 location, assign stable IDs, write them to state, and display a severity table.

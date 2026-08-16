@@ -51,6 +51,258 @@ const DEFAULT_IDLE_TIMEOUT_MS = 8 * 60 * 1000;'''
         if text.count(old_stream_args) != 1:
             raise ValueError("upstream Qwen stream arguments changed; review the runtime transform")
         text = text.replace(old_stream_args, new_stream_args)
+
+        old_usage = '''//     [--attempt-timeout-ms <ms>] [--idle-timeout-ms <ms>]
+//     [--timeout-ms <ms>] [--debug-capture] [--background]'''
+        new_usage = '''//     [--attempt-timeout-ms <ms>] [--idle-timeout-ms <ms>]
+//     [--timeout-ms <ms>] [--result-format text|json-object]
+//     [--debug-capture] [--background]'''
+        if text.count(old_usage) != 1:
+            raise ValueError("upstream Qwen runner usage changed; review the result-format transform")
+        text = text.replace(old_usage, new_usage)
+
+        old_limits = '''const MAX_RESUMES_LIMIT = 5;
+
+// Qwen 0.21.0 through 0.21.2 ignore --core-tools in Safe Mode.'''
+        new_limits = '''const MAX_RESUMES_LIMIT = 5;
+const RESULT_FORMATS = new Set(["text", "json-object"]);
+
+// Qwen 0.21.0 through 0.21.2 ignore --core-tools in Safe Mode.'''
+        if text.count(old_limits) != 1:
+            raise ValueError("upstream Qwen runner limits changed; review the result-format transform")
+        text = text.replace(old_limits, new_limits)
+
+        old_resume_prompt = '''const AUTO_RESUME_PROMPT = [
+  "The previous headless turn ended without a valid terminal result event.",
+  "Continue the same bounded review from the restored session.",
+  "Do not repeat file reads unless the review cannot be completed from restored context.",
+  "Return the final review directly.",
+].join(" ");'''
+        new_resume_prompt = '''const AUTO_RESUME_PROMPT = [
+  "The previous headless turn ended without a valid terminal result event.",
+  "Continue the same bounded review from the restored session.",
+  "Do not repeat file reads unless the review cannot be completed from restored context.",
+  "Return the final review directly.",
+].join(" ");
+
+const JSON_FORMAT_REPAIR_PROMPT = [
+  "Your previous result was rejected only because it was not exactly one JSON object.",
+  "Do not repeat the analysis or call any tool.",
+  "Restate the same review as exactly one valid JSON object, with no Markdown fence and no prose before or after it.",
+  "Preserve the meaning and every finding; do not add, remove, or change findings.",
+].join(" ");'''
+        if text.count(old_resume_prompt) != 1:
+            raise ValueError("upstream Qwen resume prompt changed; review the result-format transform")
+        text = text.replace(old_resume_prompt, new_resume_prompt)
+
+        old_arg_default = '''    timeoutMs: DEFAULT_JOB_TIMEOUT_MS,
+    debugCapture: false,'''
+        new_arg_default = '''    timeoutMs: DEFAULT_JOB_TIMEOUT_MS,
+    resultFormat: "text",
+    debugCapture: false,'''
+        if text.count(old_arg_default) != 1:
+            raise ValueError("upstream Qwen argument defaults changed; review the result-format transform")
+        text = text.replace(old_arg_default, new_arg_default)
+
+        old_timeout_case = '''      case "--timeout-ms":
+        args.timeoutMs = parseIntegerFlag(arg, optionValue(argv, i, arg), 1);
+        i += 2;
+        continue;
+      case "--debug-capture":'''
+        new_timeout_case = '''      case "--timeout-ms":
+        args.timeoutMs = parseIntegerFlag(arg, optionValue(argv, i, arg), 1);
+        i += 2;
+        continue;
+      case "--result-format": {
+        const value = optionValue(argv, i, arg);
+        if (!RESULT_FORMATS.has(value)) {
+          throw new QwenStreamError(
+            "invalid_arguments",
+            `${arg} must be one of: ${[...RESULT_FORMATS].join(", ")}`
+          );
+        }
+        args.resultFormat = value;
+        i += 2;
+        continue;
+      }
+      case "--debug-capture":'''
+        if text.count(old_timeout_case) != 1:
+            raise ValueError("upstream Qwen timeout argument changed; review the result-format transform")
+        text = text.replace(old_timeout_case, new_timeout_case)
+
+        old_bounded_prompt = '''function boundedPrompt(prompt, targets) {
+  return withDelegationBoundary(
+    `${reviewPolicyPrompt(targets)} The calling agent retains final judgment; your output is critique, not evidence.\\n\\n${prompt}`
+  );
+}
+
+function buildQwenArgs(args, targets, resumeId, prompt, attemptTimeoutMs) {'''
+        new_bounded_prompt = '''function resultFormatPrompt(resultFormat) {
+  if (resultFormat !== "json-object") return "";
+  return [
+    "Your final result must be exactly one valid JSON object.",
+    "Do not include Markdown fences or any prose before or after the object.",
+  ].join(" ");
+}
+
+function normalizeJsonObjectResult(rawOutput) {
+  const trimmed = rawOutput.trim();
+  const fenced = trimmed.match(/^```(?:json)?[ \\t]*\\r?\\n([\\s\\S]*?)\\r?\\n```$/i);
+  const candidate = fenced ? fenced[1].trim() : trimmed;
+  let parsed;
+  try {
+    parsed = JSON.parse(candidate);
+  } catch {
+    return { ok: false, error: "Qwen result was not exactly one valid JSON object" };
+  }
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+    return { ok: false, error: "Qwen result JSON must be an object" };
+  }
+  return { ok: true, value: JSON.stringify(parsed) };
+}
+
+function boundedPrompt(prompt, targets, resultFormat) {
+  return withDelegationBoundary(
+    `${reviewPolicyPrompt(targets)} The calling agent retains final judgment; your output is critique, not evidence. ${resultFormatPrompt(resultFormat)}\\n\\n${prompt}`
+  );
+}
+
+function buildQwenArgs(args, targets, resumeId, prompt, attemptTimeoutMs) {'''
+        if text.count(old_bounded_prompt) != 1:
+            raise ValueError("upstream Qwen bounded prompt changed; review the result-format transform")
+        text = text.replace(old_bounded_prompt, new_bounded_prompt)
+
+        old_prompt_call = '''  qwenArgs.push("--prompt", boundedPrompt(prompt, targets));'''
+        new_prompt_call = '''  qwenArgs.push("--prompt", boundedPrompt(prompt, targets, args.resultFormat));'''
+        if text.count(old_prompt_call) != 1:
+            raise ValueError("upstream Qwen prompt call changed; review the result-format transform")
+        text = text.replace(old_prompt_call, new_prompt_call)
+
+        old_execute_start = '''async function executeQwen(cwd, args, targets, integrityTargets, logFile) {
+  const jobStarted = Date.now();
+  let resumeId = null;
+  let prompt = args.prompt;
+  const attempts = [];'''
+        new_execute_start = '''async function executeQwen(cwd, args, targets, integrityTargets, logFile) {
+  const jobStarted = Date.now();
+  let resumeId = null;
+  let prompt = args.prompt;
+  let formatRepairActive = false;
+  const attempts = [];'''
+        if text.count(old_execute_start) != 1:
+            raise ValueError("upstream Qwen execution setup changed; review the result-format transform")
+        text = text.replace(old_execute_start, new_execute_start)
+
+        old_execute_attempt = '''    const result = await executeQwenAttempt(
+      cwd,
+      args,
+      targets,
+      logFile,'''
+        new_execute_attempt = '''    const result = await executeQwenAttempt(
+      cwd,
+      args,
+      formatRepairActive ? [] : targets,
+      logFile,'''
+        if text.count(old_execute_attempt) != 1:
+            raise ValueError("upstream Qwen attempt call changed; review the result-format transform")
+        text = text.replace(old_execute_attempt, new_execute_attempt)
+
+        old_attempt_record = '''    attempts.push({
+      attempt,
+      outcome: result.outcome,
+      errorCode: result.errorCode ?? null,'''
+        new_attempt_record = '''    attempts.push({
+      attempt,
+      purpose: formatRepairActive ? "format-repair" : "review",
+      outcome: result.outcome,
+      errorCode: result.errorCode ?? null,'''
+        if text.count(old_attempt_record) != 1:
+            raise ValueError("upstream Qwen attempt record changed; review the result-format transform")
+        text = text.replace(old_attempt_record, new_attempt_record)
+
+        old_completed = '''    if (result.outcome === "completed") {
+      appendLog(logFile, `Attempt ${attempt}: completed with verified terminal result and unchanged targets`);
+      return {
+        status: "completed",
+        sessionId: result.sessionId,
+        rawOutput: result.rawOutput,
+        usage: result.usage ?? null,
+        attempts,
+      };
+    }'''
+        new_completed = '''    if (result.outcome === "completed") {
+      if (args.resultFormat === "json-object") {
+        const normalized = normalizeJsonObjectResult(result.rawOutput);
+        if (!normalized.ok) {
+          attempts.at(-1).outcome = "incomplete";
+          attempts.at(-1).errorCode = "invalid_result_format";
+          appendLog(logFile, `Attempt ${attempt}: invalid_result_format`);
+          if (formatRepairActive || !result.sessionId || index >= args.maxResumes) {
+            return {
+              status: "failed",
+              errorCode: "invalid_result_format",
+              errorMessage: formatRepairActive
+                ? `Qwen format repair failed: ${normalized.error}`
+                : `${normalized.error}; no format-repair attempt was available`,
+              sessionId: result.sessionId,
+              rawOutput: result.rawOutput,
+              attempts,
+            };
+          }
+          formatRepairActive = true;
+          resumeId = result.sessionId;
+          prompt = JSON_FORMAT_REPAIR_PROMPT;
+          appendLog(logFile, `Attempt ${attempt}: requesting one tool-free same-session format repair`);
+          continue;
+        }
+        appendLog(logFile, `Attempt ${attempt}: completed with a verified JSON-object result and unchanged targets`);
+        return {
+          status: "completed",
+          sessionId: result.sessionId,
+          rawOutput: normalized.value,
+          usage: result.usage ?? null,
+          attempts,
+        };
+      }
+      appendLog(logFile, `Attempt ${attempt}: completed with verified terminal result and unchanged targets`);
+      return {
+        status: "completed",
+        sessionId: result.sessionId,
+        rawOutput: result.rawOutput,
+        usage: result.usage ?? null,
+        attempts,
+      };
+    }'''
+        if text.count(old_completed) != 1:
+            raise ValueError("upstream Qwen completion branch changed; review the result-format transform")
+        text = text.replace(old_completed, new_completed)
+
+        old_incomplete_resume = '''    resumeId = result.sessionId;
+    if (!resumeId || index >= args.maxResumes) {'''
+        new_incomplete_resume = '''    resumeId = result.sessionId;
+    if (formatRepairActive) {
+      return {
+        status: "stalled",
+        errorCode: result.errorCode || "format_repair_incomplete",
+        errorMessage: `${result.errorMessage}; the one format-repair attempt did not complete`,
+        sessionId: resumeId || null,
+        rawOutput: "",
+        attempts,
+      };
+    }
+    if (!resumeId || index >= args.maxResumes) {'''
+        if text.count(old_incomplete_resume) != 1:
+            raise ValueError("upstream Qwen incomplete branch changed; review the result-format transform")
+        text = text.replace(old_incomplete_resume, new_incomplete_resume)
+
+        old_child_args = '''    "--timeout-ms", String(args.timeoutMs),
+  ];'''
+        new_child_args = '''    "--timeout-ms", String(args.timeoutMs),
+    "--result-format", args.resultFormat,
+  ];'''
+        if text.count(old_child_args) != 1:
+            raise ValueError("upstream Qwen background args changed; review the result-format transform")
+        text = text.replace(old_child_args, new_child_args)
     elif path == "scripts/lib/qwen-stream.mjs":
         stream_validator_anchor = "\nexport function consumeQwenEvent(state, event) {"
         stream_validator = '''
