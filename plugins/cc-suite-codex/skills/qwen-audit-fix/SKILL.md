@@ -38,19 +38,24 @@ separate authorization before adding a file after the run starts.
 Partition an authorized scope into dependency-coherent batches of at most 20
 files and 200 KiB total source bytes. Put a file larger than 200 KiB in its own
 batch. Before starting, report the file count, byte count, batch count, round
-limit, and maximum Qwen calls:
+limit, planned review jobs, maximum recovery jobs, maximum total Qwen calls,
+30-minute inactivity limit, and 24-day maximum wall time:
 
 ```text
-maximum Qwen calls = batch count × (1 initial audit + maximum fix rounds)
+planned review jobs = batch count × (1 initial audit + maximum fix rounds)
+maximum recovery jobs = planned review jobs × 1
+maximum total Qwen calls = planned review jobs + maximum recovery jobs
 ```
 
-Here, one Qwen call means one bounded review job. A job may use up to three
-visible attempts because `--max-resumes 2` also covers incomplete terminal
-output and one same-session JSON format repair.
+Here, one Qwen call means one bounded review job. Each planned review job may
+launch at most one fresh automatic recovery job under Section 8; a recovery job
+cannot launch another recovery. A job may use up to three visible attempts
+because `--max-resumes 2` also covers incomplete terminal output and one
+same-session JSON format repair.
 
 Proceed without another question only when the user explicitly invoked this
 skill on every exact target file. Otherwise obtain confirmation of the target
-list and maximum call count.
+list and maximum total call count.
 
 ## 2. Preflight and create durable state
 
@@ -62,12 +67,16 @@ Create `.cc-suite/audits/qwen-audit-fix-{UTC timestamp}.json` before the first
 model call. Use it as the source of truth across compaction and interruptions.
 Store:
 
-- schema version, run status, authorized targets, batches, depth, severity,
-  model, maximum rounds, current round, and Qwen call count;
+- schema version, run status, authorized targets, their SHA-256 hashes, batches,
+  depth, severity, model, maximum rounds, current round, planned job count,
+  recovery job limit, and planned, recovery, and total Qwen call counts;
 - the pre-existing dirty-file list and detected test command;
 - every finding with a stable `QAF-NNNN` ID, location, severity, dimension,
   finding, suggested fix, Codex decision, status, and first/last round;
-- every Qwen job ID, test result, diff summary, failure, and stopping reason.
+- every Qwen job ID, planned-job key, recovery parent, runner
+  state/result/log path, monitor sample, anomaly classification, repair evidence,
+  target hashes before and after repair, test result, diff summary, failure, and
+  stopping reason.
 
 Use only these finding statuses: `open`, `fixed`, `not-fixed`, `partial`,
 `regressed`, `rejected`, `blocked`, and `skipped`. Re-read the state file at the
@@ -78,9 +87,10 @@ configuration. Run it once before the first edit and record the baseline exit
 code and concise failure summary. If no test command is discoverable, record
 `tests_not_found`; never label the run fully verified.
 
-## 3. Run the initial read-only audit
+## 3. Run and monitor the initial read-only audit
 
-For each batch, invoke the existing runner in the foreground:
+For each batch, invoke the runner in the background so Codex can monitor the
+job independently:
 
 ```text
 node <plugin-root>/scripts/qwen-runner.mjs
@@ -88,17 +98,51 @@ node <plugin-root>/scripts/qwen-runner.mjs
   [--model <model-id>]
   --target <exact-workspace-file>...
   --max-resumes 2
-  --attempt-timeout-ms 600000
-  --idle-timeout-ms 480000
-  --timeout-ms 1200000
+  --attempt-timeout-ms 2147483647
+  --idle-timeout-ms 1800000
+  --timeout-ms 2147483647
   --result-format json-object
+  --background
   --summary "qwen audit-fix initial batch N"
   -- <audit-prompt>
 ```
 
-Pass arguments as separate shell arguments. Keep background and debug capture
-disabled. Accept the wrapper result only when `status` is `completed`,
-`targetsVerified` is true, and `rawOutput` is non-empty. With
+`2147483647` ms (24 days, 20 hours, 31 minutes, 23.647 seconds) is the
+largest timer Node can represent without overflow. Keep debug capture disabled.
+Pass arguments as separate shell arguments.
+
+Parse the queued response and require non-empty `jobId`, `stateFile`, `jobFile`,
+and `logFile` fields. Record them in the audit state. Poll the returned state
+file and sanitized log every 30 seconds until the exact job becomes terminal.
+At every poll:
+
+1. Re-read the audit state and the runner state; select only the recorded job ID.
+2. Recompute every authorized target's SHA-256 and compare it with the recorded
+   hash.
+3. For a running job, require a positive integer `pid`, a non-empty
+   `pidStartedAt`, a live process, and an exact UTC `ps -o lstart=` match.
+4. Record status, phase, update time, process identity, latest event count, and
+   the last sanitized log line as one monitor sample.
+5. Treat these conditions as anomalies: queued for more than 120 seconds;
+   missing, unreadable, or malformed state; a changed target hash; missing or
+   recycled worker process; an active job past `deadlineAt`; 30 minutes with no
+   increase in Qwen stream events; or any `failed`, `stalled`, `interrupted`,
+   `cancelled`, policy, integrity, stream, spawn, callback, or timeout signal.
+
+On an anomaly, set the audit state to `paused` and record the exact evidence.
+If the runner still reports the job as active, send `SIGTERM` only after its
+positive PID and UTC start-time identity match the recorded values. The runner
+then terminates its isolated Qwen process tree and finalizes the job. Re-read the
+runner state, job result, log tail, target hashes, and `git status --short` before
+classifying the cause. Keep the workflow paused while Section 8 investigates,
+repairs, verifies, and either launches one permitted recovery job or stops.
+
+When the runner state becomes terminal normally, read the exact returned job
+result file. Accept it only when the job status is `completed`, the result has a
+non-empty `rawOutput`, and the recorded targets still match their hashes. The
+background job verifies its isolated and source targets before it can complete;
+this independent Codex hash check covers workspace changes during monitoring.
+With
 `--result-format json-object`, the runner accepts only a whole JSON object or
 one outer JSON code fence. It never extracts JSON from mixed prose. When Qwen
 wraps an otherwise valid result in prose, the runner may use one of the two
@@ -198,10 +242,11 @@ never repository-wide reset, checkout, or overwrite operations.
 ## 6. Re-audit and continue automatically
 
 Start a fresh Qwen review for every authorized batch using the same runner
-limits and target list. Rechecking every batch catches cross-batch regressions
-and keeps actual calls within the maximum reported in Section 1. A fresh
-session prevents the fixer from becoming its own reviewer; runner resumes
-remain reserved for incomplete output within one call.
+limits, target list, background mode, and monitoring contract from Section 3.
+Rechecking every batch catches cross-batch regressions and keeps planned and
+recovery calls within the maximum reported in Section 1. A fresh session
+prevents the fixer from becoming its own reviewer; runner resumes remain
+reserved for incomplete output within one call.
 
 Include every prior accepted finding in the prompt as ID, location, severity,
 issue, and current status. Require the same JSON envelope, with these additions:
@@ -241,7 +286,8 @@ State: <path>
 Scope: <exact files and batches>
 Depth: <mini|full>
 Rounds: <used>/<maximum>
-Qwen calls: <used>/<maximum>
+Qwen calls: <planned used> planned + <recovery used> recovery / <maximum total>
+Recoveries: <planned-job key, failed job ID, repair, replacement job ID, outcome>
 Tests: <baseline and final result>
 Result: <clean|clean_with_rejections|partial|blocked|failed>
 
@@ -267,15 +313,47 @@ failure prevents that conclusion.
 
 ## 8. Handle interruptions and failures
 
-Resume an interrupted run only from its state file. Verify the recorded target
-list, current file hashes or diffs, dirty-file baseline, last terminal Qwen job,
-and test status before continuing. Ask before resuming when the target set or
-unrelated workspace state changed.
+Resume an interrupted or paused run only from its state file. Verify the
+recorded target list, current hashes and diffs, dirty-file baseline, runner
+process identity, last terminal Qwen job, anomaly evidence, and test status
+before continuing. Ask before resuming when the target set or unrelated
+workspace state changed.
 
-Stop on failed preflight, runner policy or integrity failure, invalid review
-output, test regression that cannot be repaired locally, or exhausted rounds.
-Record the exact failure and preserve completed fixes. Never substitute another
-reviewer while reporting that Qwen completed the audit.
+For a newly detected anomaly, keep the affected job terminal and investigate
+before editing or launching anything. Classify it as `recoverable` only when all
+of these gates pass:
+
+1. The runner and its isolated Qwen process tree are no longer active. When
+   termination was necessary, the recorded PID and UTC start-time identity were
+   verified before sending `SIGTERM`.
+2. The authorized target list, unrelated workspace state, and user-approved
+   scope are unchanged. Record any authorized target hash changed by the repair.
+3. The evidence identifies a concrete cause and the smallest in-scope repair.
+   For a dead or stalled isolated job, verified process-tree cleanup plus fresh
+   runner state is a repair; a provider outage with no verified remedy is not.
+4. Codex applies only that repair, records its before/after evidence, reruns
+   focused and baseline tests when project files changed, and reruns Qwen
+   preflight successfully. Only after those checks pass, replace an authorized
+   target's expected hash with its recorded post-repair hash.
+5. The planned-job key has used no recovery, and launching one replacement stays
+   within the declared recovery and total Qwen call limits.
+
+When every gate passes, increment the recovery count and automatically start one
+fresh Qwen job with a new job ID, the same planned-job key, batch, prompt, model,
+targets, runner limits, and monitoring contract. Link it to the terminal job in
+state. Do not resume or reuse the failed session. A successful replacement
+returns to the normal adjudication, fix, test, and re-audit flow.
+
+Classify the anomaly as a hard stop when it involves a policy or integrity
+failure, forbidden tool or scope, process-identity mismatch, unexpected target
+or unrelated workspace change, malformed or unsupported stream protocol,
+invalid review output after the declared same-session format repair, unavailable
+credentials, failed recovery preflight, a required user decision, an
+unrepairable test regression, or no evidence-backed remedy. An anomaly in the
+recovery job is always a hard stop. Record the exact failure and preserve
+completed fixes. Never launch a second recovery for the same planned job, exceed
+the declared call limit, or substitute another reviewer while reporting that
+Qwen completed the audit.
 
 ## 9. Example invocations
 

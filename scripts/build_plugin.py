@@ -65,12 +65,33 @@ const DEFAULT_IDLE_TIMEOUT_MS = 8 * 60 * 1000;'''
 
 // Qwen 0.21.0 through 0.21.2 ignore --core-tools in Safe Mode.'''
         new_limits = '''const MAX_RESUMES_LIMIT = 5;
+const MAX_TIMER_MS = 2_147_483_647;
 const RESULT_FORMATS = new Set(["text", "json-object"]);
 
 // Qwen 0.21.0 through 0.21.2 ignore --core-tools in Safe Mode.'''
         if text.count(old_limits) != 1:
             raise ValueError("upstream Qwen runner limits changed; review the result-format transform")
         text = text.replace(old_limits, new_limits)
+
+        old_timeout_flags = '''      case "--attempt-timeout-ms":
+        args.attemptTimeoutMs = parseIntegerFlag(arg, optionValue(argv, i, arg), 1);
+        i += 2;
+        continue;
+      case "--idle-timeout-ms":
+        args.idleTimeoutMs = parseIntegerFlag(arg, optionValue(argv, i, arg), 1);
+        i += 2;
+        continue;'''
+        new_timeout_flags = '''      case "--attempt-timeout-ms":
+        args.attemptTimeoutMs = parseIntegerFlag(arg, optionValue(argv, i, arg), 1, MAX_TIMER_MS);
+        i += 2;
+        continue;
+      case "--idle-timeout-ms":
+        args.idleTimeoutMs = parseIntegerFlag(arg, optionValue(argv, i, arg), 1, MAX_TIMER_MS);
+        i += 2;
+        continue;'''
+        if text.count(old_timeout_flags) != 1:
+            raise ValueError("upstream Qwen attempt or idle timeout argument changed; review the timer transform")
+        text = text.replace(old_timeout_flags, new_timeout_flags)
 
         old_resume_prompt = '''const AUTO_RESUME_PROMPT = [
   "The previous headless turn ended without a valid terminal result event.",
@@ -110,7 +131,7 @@ const JSON_FORMAT_REPAIR_PROMPT = [
         continue;
       case "--debug-capture":'''
         new_timeout_case = '''      case "--timeout-ms":
-        args.timeoutMs = parseIntegerFlag(arg, optionValue(argv, i, arg), 1);
+        args.timeoutMs = parseIntegerFlag(arg, optionValue(argv, i, arg), 1, MAX_TIMER_MS);
         i += 2;
         continue;
       case "--result-format": {
@@ -303,6 +324,61 @@ function buildQwenArgs(args, targets, resumeId, prompt, attemptTimeoutMs) {'''
         if text.count(old_child_args) != 1:
             raise ValueError("upstream Qwen background args changed; review the result-format transform")
         text = text.replace(old_child_args, new_child_args)
+
+        old_state_imports = '''  createJobLogFile,
+  resolveJobLogFile,
+  upsertJob,
+  writeJobFile,'''
+        new_state_imports = '''  createJobLogFile,
+  resolveJobFile,
+  resolveJobLogFile,
+  resolveStateFile,
+  upsertJob,
+  writeJobFile,'''
+        if text.count(old_state_imports) != 1:
+            raise ValueError("upstream Qwen state imports changed; review the monitoring-path transform")
+        text = text.replace(old_state_imports, new_state_imports)
+
+        old_background_result = '''      process.stdout.write(JSON.stringify({
+        jobId,
+        status: "queued",
+        message: `Job ${jobId} started in background.`,
+      }) + "\\n");'''
+        new_background_result = '''      process.stdout.write(JSON.stringify({
+        jobId,
+        status: "queued",
+        stateFile: resolveStateFile(cwd),
+        jobFile: resolveJobFile(cwd, jobId),
+        logFile,
+        message: `Job ${jobId} started in background.`,
+      }) + "\\n");'''
+        if text.count(old_background_result) != 1:
+            raise ValueError("upstream Qwen background result changed; review the monitoring-path transform")
+        text = text.replace(old_background_result, new_background_result)
+
+        old_success_persistence = '''    upsertJob(cwd, {
+      id: jobId,
+      status: result.status,
+      phase: result.status,
+      threadId: result.sessionId || null,
+      attempts: result.attempts.length,
+      completedAt: new Date().toISOString(),
+      ...(result.errorMessage ? { errorMessage: result.errorMessage, errorCode: result.errorCode } : {}),
+    });
+    writeJobFile(cwd, jobId, jobPayload(result));'''
+        new_success_persistence = '''    writeJobFile(cwd, jobId, jobPayload(result));
+    upsertJob(cwd, {
+      id: jobId,
+      status: result.status,
+      phase: result.status,
+      threadId: result.sessionId || null,
+      attempts: result.attempts.length,
+      completedAt: new Date().toISOString(),
+      ...(result.errorMessage ? { errorMessage: result.errorMessage, errorCode: result.errorCode } : {}),
+    });'''
+        if text.count(old_success_persistence) != 2:
+            raise ValueError("upstream Qwen success persistence changed; review the monitoring-order transform")
+        text = text.replace(old_success_persistence, new_success_persistence)
     elif path == "scripts/lib/qwen-stream.mjs":
         stream_validator_anchor = "\nexport function consumeQwenEvent(state, event) {"
         stream_validator = '''

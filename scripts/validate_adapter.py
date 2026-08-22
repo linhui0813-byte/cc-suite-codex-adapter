@@ -88,7 +88,7 @@ def main() -> int:
     if audit_fix.is_file():
         audit_text = audit_fix.read_text(encoding="utf-8")
         for marker in (
-            "maximum Qwen calls",
+            "maximum total Qwen calls",
             ".cc-suite/audits/qwen-audit-fix-",
             "Qwen output is a hypothesis, not proof.",
             "Start a fresh Qwen review",

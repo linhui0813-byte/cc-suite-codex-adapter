@@ -20,7 +20,9 @@ import {
   claimJob,
   generateJobId,
   createJobLogFile,
+  resolveJobFile,
   resolveJobLogFile,
+  resolveStateFile,
   upsertJob,
   writeJobFile,
 } from "./lib/state.mjs";
@@ -48,6 +50,7 @@ const HEARTBEAT_MS = 30 * 1000;
 const EXIT_GRACE_MS = 10 * 1000;
 const SIGKILL_GRACE_MS = 5 * 1000;
 const MAX_RESUMES_LIMIT = 5;
+const MAX_TIMER_MS = 2_147_483_647;
 const RESULT_FORMATS = new Set(["text", "json-object"]);
 
 // Qwen 0.21.0 through 0.21.2 ignore --core-tools in Safe Mode. Deny every known
@@ -221,15 +224,15 @@ function parseArgs(argv) {
         i += 2;
         continue;
       case "--attempt-timeout-ms":
-        args.attemptTimeoutMs = parseIntegerFlag(arg, optionValue(argv, i, arg), 1);
+        args.attemptTimeoutMs = parseIntegerFlag(arg, optionValue(argv, i, arg), 1, MAX_TIMER_MS);
         i += 2;
         continue;
       case "--idle-timeout-ms":
-        args.idleTimeoutMs = parseIntegerFlag(arg, optionValue(argv, i, arg), 1);
+        args.idleTimeoutMs = parseIntegerFlag(arg, optionValue(argv, i, arg), 1, MAX_TIMER_MS);
         i += 2;
         continue;
       case "--timeout-ms":
-        args.timeoutMs = parseIntegerFlag(arg, optionValue(argv, i, arg), 1);
+        args.timeoutMs = parseIntegerFlag(arg, optionValue(argv, i, arg), 1, MAX_TIMER_MS);
         i += 2;
         continue;
       case "--result-format": {
@@ -940,6 +943,7 @@ async function runForeground(cwd, args) {
     } finally {
       if (stage) cleanupReviewStage(stage);
     }
+    writeJobFile(cwd, jobId, jobPayload(result));
     upsertJob(cwd, {
       id: jobId,
       status: result.status,
@@ -949,7 +953,6 @@ async function runForeground(cwd, args) {
       completedAt: new Date().toISOString(),
       ...(result.errorMessage ? { errorMessage: result.errorMessage, errorCode: result.errorCode } : {}),
     });
-    writeJobFile(cwd, jobId, jobPayload(result));
 
     process.stdout.write(JSON.stringify({
       jobId,
@@ -1081,6 +1084,9 @@ function runBackground(cwd, args) {
       process.stdout.write(JSON.stringify({
         jobId,
         status: "queued",
+        stateFile: resolveStateFile(cwd),
+        jobFile: resolveJobFile(cwd, jobId),
+        logFile,
         message: `Job ${jobId} started in background.`,
       }) + "\n");
       resolve();
@@ -1125,6 +1131,7 @@ async function runBackgroundWorker(cwd, args, jobId) {
     } finally {
       if (stage) cleanupReviewStage(stage);
     }
+    writeJobFile(cwd, jobId, jobPayload(result));
     upsertJob(cwd, {
       id: jobId,
       status: result.status,
@@ -1134,7 +1141,6 @@ async function runBackgroundWorker(cwd, args, jobId) {
       completedAt: new Date().toISOString(),
       ...(result.errorMessage ? { errorMessage: result.errorMessage, errorCode: result.errorCode } : {}),
     });
-    writeJobFile(cwd, jobId, jobPayload(result));
   } finally {
     ACTIVE_JOB_CONTEXTS.delete(jobContext);
   }

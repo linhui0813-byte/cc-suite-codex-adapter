@@ -531,6 +531,34 @@ for (const value of ["", " ", "0x10", "1e2"]) {
   });
 }
 
+test("timeout flags reject values above the Node timer ceiling", () => {
+  for (const flag of ["--attempt-timeout-ms", "--idle-timeout-ms", "--timeout-ms"]) {
+    const run = runFake("normal", [flag, "2147483648"]);
+    try {
+      assert.notEqual(run.result.status, 0);
+      assert.equal(run.output.status, "failed");
+      assert.equal(run.output.errorCode, "invalid_arguments");
+      assert.match(run.output.error, /1 to 2147483647/);
+    } finally {
+      cleanupDir(run.dir);
+    }
+  }
+});
+
+test("timeout flags accept the maximum safe Node timer", () => {
+  const run = runFake("normal", [
+    "--attempt-timeout-ms", "2147483647",
+    "--idle-timeout-ms", "2147483647",
+    "--timeout-ms", "2147483647",
+  ]);
+  try {
+    assert.equal(run.result.status, 0, JSON.stringify(run.output));
+    assert.equal(run.output.status, "completed");
+  } finally {
+    cleanupDir(run.dir);
+  }
+});
+
 test("hash mismatch fails even when Qwen emits a success result", () => {
   const run = runFake("mutate", ["--target", "draft.md"]);
   try {
@@ -646,6 +674,11 @@ test("a fast background review reaches terminal state without being clobbered", 
     assert.equal(parent.status, 0);
     const queued = JSON.parse(parent.stdout.trim());
     assert.equal(queued.status, "queued");
+    assert.ok(path.isAbsolute(queued.stateFile));
+    assert.ok(path.isAbsolute(queued.jobFile));
+    assert.ok(path.isAbsolute(queued.logFile));
+    assert.equal(path.basename(queued.jobFile), `${queued.jobId}.json`);
+    assert.equal(path.basename(queued.logFile), `${queued.jobId}.log`);
 
     let job = null;
     for (let attempt = 0; attempt < 100; attempt += 1) {
@@ -656,6 +689,9 @@ test("a fast background review reaches terminal state without being clobbered", 
     }
     assert.equal(job?.status, "completed");
     assert.ok(job.completedAt);
+    assert.equal(job.logFile, queued.logFile);
+    assert.ok(fs.existsSync(queued.stateFile));
+    assert.ok(fs.existsSync(queued.jobFile));
   } finally {
     cleanupDir(fixture.dir);
   }
