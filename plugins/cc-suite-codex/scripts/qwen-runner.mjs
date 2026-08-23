@@ -159,6 +159,13 @@ const JSON_FORMAT_REPAIR_PROMPT = [
   "Preserve the meaning and every finding; do not add, remove, or change findings.",
 ].join(" ");
 
+const TRANSPORT_REPAIR_PROMPT = [
+  "Your previous assistant response completed, but its terminal result record was truncated while the CLI exited.",
+  "Do not call any tool or repeat the analysis.",
+  "Restate the same final review in at most 4,000 characters, preserving the recommendation, material findings, and risks.",
+  "Return the final review directly so the terminal result can be verified.",
+].join(" ");
+
 function parseIntegerFlag(flag, value, minimum, maximum = Number.MAX_SAFE_INTEGER) {
   if (!/^\d+$/.test(value)) {
     throw new QwenStreamError("invalid_arguments", `${flag} must be a decimal integer`);
@@ -664,12 +671,33 @@ function executeQwenAttempt(cwd, args, targets, logFile, attempt, resumeId, prom
         return;
       }
       if (!protocolError) {
+        let trailingLine = null;
         try {
-          for (const line of decoder.finish()) consumeLine(line);
+          for (const line of decoder.finish()) {
+            trailingLine = line;
+            consumeLine(line);
+          }
         } catch (error) {
-          protocolError = error instanceof QwenStreamError
+          const parsedError = error instanceof QwenStreamError
             ? error
             : new QwenStreamError("stream_failure", error.message);
+          const cleanTruncatedResult =
+            parsedError.code === "invalid_json" &&
+            code === 0 &&
+            state.toolBoundaryVerified &&
+            Boolean(state.sessionId) &&
+            !state.resultSeen &&
+            state.pendingToolCallIds.size === 0 &&
+            state.pendingAnonymousToolCalls === 0 &&
+            typeof trailingLine === "string" &&
+            trailingLine.trimStart().startsWith('{"type":"result"') &&
+            /Unterminated string|Unexpected end of JSON/.test(parsedError.message);
+          protocolError = cleanTruncatedResult
+            ? new QwenStreamError(
+                "truncated_terminal_json",
+                "Qwen cleanly exited before its terminal result record finished flushing"
+              )
+            : parsedError;
         }
       }
 
@@ -684,7 +712,7 @@ function executeQwenAttempt(cwd, args, targets, logFile, attempt, resumeId, prom
       }
       if (protocolError) {
         finish({
-          outcome: "failed",
+          outcome: protocolError.code === "truncated_terminal_json" ? "incomplete" : "failed",
           errorCode: protocolError.code,
           errorMessage: protocolError.message,
           rawOutput: "",
@@ -740,6 +768,7 @@ async function executeQwen(cwd, args, targets, integrityTargets, logFile) {
   let resumeId = null;
   let prompt = args.prompt;
   let formatRepairActive = false;
+  let transportRepairActive = false;
   const attempts = [];
 
   for (let index = 0; index <= args.maxResumes; index += 1) {
@@ -759,7 +788,7 @@ async function executeQwen(cwd, args, targets, integrityTargets, logFile) {
     const result = await executeQwenAttempt(
       cwd,
       args,
-      formatRepairActive ? [] : targets,
+      formatRepairActive || transportRepairActive ? [] : targets,
       logFile,
       attempt,
       resumeId,
@@ -768,7 +797,11 @@ async function executeQwen(cwd, args, targets, integrityTargets, logFile) {
     );
     attempts.push({
       attempt,
-      purpose: formatRepairActive ? "format-repair" : "review",
+      purpose: formatRepairActive
+        ? "format-repair"
+        : transportRepairActive
+          ? "transport-repair"
+          : "review",
       outcome: result.outcome,
       errorCode: result.errorCode ?? null,
       sessionId: result.sessionId,
@@ -871,6 +904,16 @@ async function executeQwen(cwd, args, targets, integrityTargets, logFile) {
         attempts,
       };
     }
+    if (transportRepairActive) {
+      return {
+        status: "stalled",
+        errorCode: result.errorCode || "transport_repair_incomplete",
+        errorMessage: `${result.errorMessage}; the one transport-repair attempt did not complete`,
+        sessionId: resumeId || null,
+        rawOutput: "",
+        attempts,
+      };
+    }
     if (!resumeId || index >= args.maxResumes) {
       return {
         status: "stalled",
@@ -882,6 +925,12 @@ async function executeQwen(cwd, args, targets, integrityTargets, logFile) {
         rawOutput: "",
         attempts,
       };
+    }
+    if (result.errorCode === "truncated_terminal_json") {
+      transportRepairActive = true;
+      prompt = TRANSPORT_REPAIR_PROMPT;
+      appendLog(logFile, `Attempt ${attempt}: requesting one tool-free same-session transport repair`);
+      continue;
     }
     appendLog(logFile, `Attempt ${attempt}: incomplete — resuming session ${resumeId}`);
     prompt = AUTO_RESUME_PROMPT;

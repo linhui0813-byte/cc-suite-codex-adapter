@@ -76,6 +76,13 @@ if (mode === "goal-stream") {
 if (mode === "timeout-resume" && !resumed) {
   process.stdout.write('{"type":"assistant"');
   setInterval(() => {}, 1000);
+} else if (mode === "truncated-terminal-resume" && !resumed) {
+  emit({ type: "assistant", session_id: session, message: { content: [{ type: "text", text: "complete review before terminal transport failure" }] } });
+  process.stdout.write('{"type":"result","subtype":"success","session_id":"' + session + '","is_error":false,"result":"truncated');
+  process.exit(0);
+} else if (mode === "truncated-non-result") {
+  process.stdout.write('{"type":"assistant"');
+  process.exit(0);
 } else if (mode === "signal-hang") {
   process.on("SIGTERM", () => {});
   setInterval(() => {}, 1000);
@@ -390,6 +397,35 @@ test("a timeout with a truncated JSON line resumes instead of failing parsing", 
   }
 });
 
+test("a clean EOF-truncated terminal result gets one tool-free same-session repair", () => {
+  const run = runFake(
+    "truncated-terminal-resume",
+    ["--target", "draft.md"],
+    { maxResumes: 1 }
+  );
+  try {
+    assert.equal(run.result.status, 0, JSON.stringify(run.output));
+    assert.equal(run.output.status, "completed");
+    assert.equal(run.output.rawOutput, "resumed review");
+    assert.equal(run.output.attempts.length, 2);
+    assert.equal(run.output.attempts[0].purpose, "review");
+    assert.equal(run.output.attempts[0].outcome, "incomplete");
+    assert.equal(run.output.attempts[0].errorCode, "truncated_terminal_json");
+    assert.equal(run.output.attempts[1].purpose, "transport-repair");
+    assert.equal(run.output.attempts[1].sessionId, "fake-qwen-session");
+    assert.equal(run.output.attempts[1].toolBoundaryVerified, true);
+
+    const args = JSON.parse(fs.readFileSync(run.argsFile, "utf8"));
+    assert.ok(args.includes("--resume"));
+    assert.equal(args[args.indexOf("--max-tool-calls") + 1], "0");
+    assert.ok(args[args.indexOf("--exclude-tools") + 1].split(",").includes("read_file"));
+    assert.match(args[args.indexOf("--prompt") + 1], /terminal result record was truncated/);
+    assert.match(args[args.indexOf("--prompt") + 1], /at most 4,000 characters/);
+  } finally {
+    cleanupDir(run.dir);
+  }
+});
+
 test("qwen runner allows read_file only for the exact declared target", () => {
   const fixture = setup();
   const result = spawnSync(process.execPath, [
@@ -424,6 +460,7 @@ test("qwen runner allows read_file only for the exact declared target", () => {
 
 for (const [mode, errorCode] of [
   ["malformed", "invalid_json"],
+  ["truncated-non-result", "invalid_json"],
   ["forbidden", "forbidden_tool"],
   ["unexpected-init-tool", "tool_boundary_mismatch"],
   ["wrong-target", "forbidden_tool_path"],

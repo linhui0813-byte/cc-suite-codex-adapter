@@ -111,6 +111,13 @@ const JSON_FORMAT_REPAIR_PROMPT = [
   "Do not repeat the analysis or call any tool.",
   "Restate the same review as exactly one valid JSON object, with no Markdown fence and no prose before or after it.",
   "Preserve the meaning and every finding; do not add, remove, or change findings.",
+].join(" ");
+
+const TRANSPORT_REPAIR_PROMPT = [
+  "Your previous assistant response completed, but its terminal result record was truncated while the CLI exited.",
+  "Do not call any tool or repeat the analysis.",
+  "Restate the same final review in at most 4,000 characters, preserving the recommendation, material findings, and risks.",
+  "Return the final review directly so the terminal result can be verified.",
 ].join(" ");'''
         if text.count(old_resume_prompt) != 1:
             raise ValueError("upstream Qwen resume prompt changed; review the result-format transform")
@@ -209,6 +216,7 @@ function buildQwenArgs(args, targets, resumeId, prompt, attemptTimeoutMs) {'''
   let resumeId = null;
   let prompt = args.prompt;
   let formatRepairActive = false;
+  let transportRepairActive = false;
   const attempts = [];'''
         if text.count(old_execute_start) != 1:
             raise ValueError("upstream Qwen execution setup changed; review the result-format transform")
@@ -222,7 +230,7 @@ function buildQwenArgs(args, targets, resumeId, prompt, attemptTimeoutMs) {'''
         new_execute_attempt = '''    const result = await executeQwenAttempt(
       cwd,
       args,
-      formatRepairActive ? [] : targets,
+      formatRepairActive || transportRepairActive ? [] : targets,
       logFile,'''
         if text.count(old_execute_attempt) != 1:
             raise ValueError("upstream Qwen attempt call changed; review the result-format transform")
@@ -234,7 +242,11 @@ function buildQwenArgs(args, targets, resumeId, prompt, attemptTimeoutMs) {'''
       errorCode: result.errorCode ?? null,'''
         new_attempt_record = '''    attempts.push({
       attempt,
-      purpose: formatRepairActive ? "format-repair" : "review",
+      purpose: formatRepairActive
+        ? "format-repair"
+        : transportRepairActive
+          ? "transport-repair"
+          : "review",
       outcome: result.outcome,
       errorCode: result.errorCode ?? null,'''
         if text.count(old_attempt_record) != 1:
@@ -311,10 +323,34 @@ function buildQwenArgs(args, targets, resumeId, prompt, attemptTimeoutMs) {'''
         attempts,
       };
     }
+    if (transportRepairActive) {
+      return {
+        status: "stalled",
+        errorCode: result.errorCode || "transport_repair_incomplete",
+        errorMessage: `${result.errorMessage}; the one transport-repair attempt did not complete`,
+        sessionId: resumeId || null,
+        rawOutput: "",
+        attempts,
+      };
+    }
     if (!resumeId || index >= args.maxResumes) {'''
         if text.count(old_incomplete_resume) != 1:
             raise ValueError("upstream Qwen incomplete branch changed; review the result-format transform")
         text = text.replace(old_incomplete_resume, new_incomplete_resume)
+
+        old_resume_action = '''    appendLog(logFile, `Attempt ${attempt}: incomplete — resuming session ${resumeId}`);
+    prompt = AUTO_RESUME_PROMPT;'''
+        new_resume_action = '''    if (result.errorCode === "truncated_terminal_json") {
+      transportRepairActive = true;
+      prompt = TRANSPORT_REPAIR_PROMPT;
+      appendLog(logFile, `Attempt ${attempt}: requesting one tool-free same-session transport repair`);
+      continue;
+    }
+    appendLog(logFile, `Attempt ${attempt}: incomplete — resuming session ${resumeId}`);
+    prompt = AUTO_RESUME_PROMPT;'''
+        if text.count(old_resume_action) != 1:
+            raise ValueError("upstream Qwen resume action changed; review the terminal-transport transform")
+        text = text.replace(old_resume_action, new_resume_action)
 
         old_child_args = '''    "--timeout-ms", String(args.timeoutMs),
   ];'''
@@ -379,6 +415,71 @@ function buildQwenArgs(args, targets, resumeId, prompt, attemptTimeoutMs) {'''
         if text.count(old_success_persistence) != 2:
             raise ValueError("upstream Qwen success persistence changed; review the monitoring-order transform")
         text = text.replace(old_success_persistence, new_success_persistence)
+
+        old_tail_parse = '''      if (!protocolError) {
+        try {
+          for (const line of decoder.finish()) consumeLine(line);
+        } catch (error) {
+          protocolError = error instanceof QwenStreamError
+            ? error
+            : new QwenStreamError("stream_failure", error.message);
+        }
+      }'''
+        new_tail_parse = '''      if (!protocolError) {
+        let trailingLine = null;
+        try {
+          for (const line of decoder.finish()) {
+            trailingLine = line;
+            consumeLine(line);
+          }
+        } catch (error) {
+          const parsedError = error instanceof QwenStreamError
+            ? error
+            : new QwenStreamError("stream_failure", error.message);
+          const cleanTruncatedResult =
+            parsedError.code === "invalid_json" &&
+            code === 0 &&
+            state.toolBoundaryVerified &&
+            Boolean(state.sessionId) &&
+            !state.resultSeen &&
+            state.pendingToolCallIds.size === 0 &&
+            state.pendingAnonymousToolCalls === 0 &&
+            typeof trailingLine === "string" &&
+            trailingLine.trimStart().startsWith('{"type":"result"') &&
+            /Unterminated string|Unexpected end of JSON/.test(parsedError.message);
+          protocolError = cleanTruncatedResult
+            ? new QwenStreamError(
+                "truncated_terminal_json",
+                "Qwen cleanly exited before its terminal result record finished flushing"
+              )
+            : parsedError;
+        }
+      }'''
+        if text.count(old_tail_parse) != 1:
+            raise ValueError("upstream Qwen EOF parser changed; review the terminal-transport transform")
+        text = text.replace(old_tail_parse, new_tail_parse)
+
+        old_protocol_failure = '''      if (protocolError) {
+        finish({
+          outcome: "failed",
+          errorCode: protocolError.code,
+          errorMessage: protocolError.message,
+          rawOutput: "",
+        });
+        return;
+      }'''
+        new_protocol_failure = '''      if (protocolError) {
+        finish({
+          outcome: protocolError.code === "truncated_terminal_json" ? "incomplete" : "failed",
+          errorCode: protocolError.code,
+          errorMessage: protocolError.message,
+          rawOutput: "",
+        });
+        return;
+      }'''
+        if text.count(old_protocol_failure) != 1:
+            raise ValueError("upstream Qwen protocol failure branch changed; review the terminal-transport transform")
+        text = text.replace(old_protocol_failure, new_protocol_failure)
     elif path == "scripts/lib/qwen-stream.mjs":
         stream_validator_anchor = "\nexport function consumeQwenEvent(state, event) {"
         stream_validator = '''

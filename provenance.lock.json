@@ -1,7 +1,7 @@
 {
   "adapter": {
     "repository": "https://github.com/linhui0813-byte/cc-suite-codex-adapter",
-    "revision": 9,
+    "revision": 10,
     "runtime_files": [
       "scripts/lib/delegation-boundary.mjs",
       "scripts/lib/process.mjs",
@@ -20,12 +20,12 @@
       "qwen-review",
       "repair"
     ],
-    "sync_time": "2026-08-22T15:12:49Z",
-    "version": "2.0.0+codex.adapter-9"
+    "sync_time": "2026-08-23T12:38:58Z",
+    "version": "2.0.0+codex.adapter-10"
   },
   "artifact": {
     "plugin_path": "plugins/cc-suite-codex",
-    "tree_sha256": "466734283b8c7ea6e9f1c128cedcd90dc77a847659fc440f73242b3af13f8650"
+    "tree_sha256": "6c5b570704fabf615ea646bc4998f66d377f06c648225a872b3c84ef426f3d77"
   },
   "schema_version": 2,
   "upstream": {
