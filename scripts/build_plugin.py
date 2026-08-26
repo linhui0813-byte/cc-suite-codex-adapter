@@ -33,6 +33,17 @@ def transform_runtime(path: str, value: bytes) -> bytes:
             raise ValueError("upstream Qwen preflight hint changed; review the runtime transform")
         text = text.replace(old, "install Qwen Code, then invoke $cc-suite-codex:qwen-preflight")
 
+        old_forbidden_tail = '''  "computer_use__zoom",
+];'''
+        new_forbidden_tail = '''  "computer_use__zoom",
+  "report_findings",
+];'''
+        if text.count(old_forbidden_tail) != 1:
+            raise ValueError(
+                "upstream Qwen forbidden tool list changed; review the report_findings transform"
+            )
+        text = text.replace(old_forbidden_tail, new_forbidden_tail)
+
         old_timeouts = '''const DEFAULT_JOB_TIMEOUT_MS = 15 * 60 * 1000;
 const DEFAULT_ATTEMPT_TIMEOUT_MS = 5 * 60 * 1000;
 const DEFAULT_IDLE_TIMEOUT_MS = 4 * 60 * 1000;'''

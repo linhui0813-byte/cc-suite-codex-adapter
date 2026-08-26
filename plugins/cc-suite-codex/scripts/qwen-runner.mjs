@@ -137,6 +137,7 @@ const QWEN_FORBIDDEN_TOOLS = [
   "computer_use__stop_recording",
   "computer_use__type_text",
   "computer_use__zoom",
+  "report_findings",
 ];
 
 const ACTIVE_QWEN_CHILDREN = new Set();

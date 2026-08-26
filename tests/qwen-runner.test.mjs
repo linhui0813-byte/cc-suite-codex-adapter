@@ -51,6 +51,9 @@ const emit = (value) => process.stdout.write(JSON.stringify(value) + "\\n");
 const excludes = args[args.indexOf("--exclude-tools") + 1]?.split(",") || [];
 const tools = excludes.includes("read_file") ? [] : ["read_file"];
 if (mode === "unexpected-init-tool") tools.push("agent");
+if (mode === "qwen-022-report-findings" && !excludes.includes("report_findings")) {
+  tools.push("report_findings");
+}
 if (process.env.FAKE_QWEN_CWD_FILE) {
   fs.writeFileSync(process.env.FAKE_QWEN_CWD_FILE, process.cwd());
 }
@@ -216,6 +219,19 @@ test("qwen runner accepts the Qwen 0.21.4 goal_state stream event", () => {
     assert.equal(run.result.status, 0, JSON.stringify(run.output));
     assert.equal(run.output.status, "completed");
     assert.equal(run.output.rawOutput, "review");
+  } finally {
+    cleanupDir(run.dir);
+  }
+});
+
+test("qwen runner excludes the Qwen 0.22 report_findings UI tool", () => {
+  const run = runFake("qwen-022-report-findings", ["--target", "draft.md"]);
+  try {
+    assert.equal(run.result.status, 0, JSON.stringify(run.output));
+    assert.equal(run.output.status, "completed");
+    const args = JSON.parse(fs.readFileSync(run.argsFile, "utf8"));
+    const excluded = args[args.indexOf("--exclude-tools") + 1].split(",");
+    assert.ok(excluded.includes("report_findings"));
   } finally {
     cleanupDir(run.dir);
   }
