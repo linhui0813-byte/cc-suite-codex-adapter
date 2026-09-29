@@ -20,22 +20,22 @@
       "qwen-review",
       "repair"
     ],
-    "sync_time": "2026-08-26T15:22:11Z",
-    "version": "2.0.0+codex.adapter-11"
+    "sync_time": "2026-09-29T22:20:34Z",
+    "version": "2.3.1+codex.adapter-11"
   },
   "artifact": {
     "plugin_path": "plugins/cc-suite-codex",
-    "tree_sha256": "4b2b18dfa2763bba3a30660a414483f9e9cf5cfbf4e492014e2d4224078cb667"
+    "tree_sha256": "6106f7ca798bac2c5d2ad14f8032fd4ac1cbb59a4773f9d61df1a7cf87e8888d"
   },
   "schema_version": 2,
   "upstream": {
-    "archive_sha256": "02d8afe73207e3a50641eacfadc5ce9afd3ed1bc33bfef778930f080e278c65b",
-    "archive_url": "https://github.com/xiaolai/cc-suite/archive/9fe95167c2b2aeec8e734c75c99768bf0886dd00.tar.gz",
-    "commit": "9fe95167c2b2aeec8e734c75c99768bf0886dd00",
+    "archive_sha256": "ecd58d9703e4d96d48d83579baadf1b99ca3d1346f02b56a92153c8cb6e7258a",
+    "archive_url": "https://github.com/xiaolai/cc-suite/archive/d191be8dbe884ad2c82c658fdee9ad4eff8fcf4e.tar.gz",
+    "commit": "d191be8dbe884ad2c82c658fdee9ad4eff8fcf4e",
     "license_sha256": "87b3f4064cb76d1c7cc8c39546d7d62790b76372f37cfb9de1bb828a5f652b51",
     "package_path": "package.json",
     "ref": "refs/heads/main",
     "repository": "https://github.com/xiaolai/cc-suite",
-    "version": "2.0.0"
+    "version": "2.3.1"
   }
 }
