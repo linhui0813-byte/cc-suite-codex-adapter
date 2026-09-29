@@ -1,8 +1,8 @@
 {
   "adapter_repository": "https://github.com/linhui0813-byte/cc-suite-codex-adapter",
-  "adapter_version": "2.0.0+codex.adapter-11",
-  "archive_sha256": "02d8afe73207e3a50641eacfadc5ce9afd3ed1bc33bfef778930f080e278c65b",
-  "commit": "9fe95167c2b2aeec8e734c75c99768bf0886dd00",
+  "adapter_version": "2.3.1+codex.adapter-11",
+  "archive_sha256": "ecd58d9703e4d96d48d83579baadf1b99ca3d1346f02b56a92153c8cb6e7258a",
+  "commit": "d191be8dbe884ad2c82c658fdee9ad4eff8fcf4e",
   "plugin_name": "cc-suite-codex",
   "ref": "refs/heads/main",
   "runtime_files": [
@@ -50,5 +50,5 @@
     }
   ],
   "source": "https://github.com/xiaolai/cc-suite",
-  "version": "2.0.0"
+  "version": "2.3.1"
 }
