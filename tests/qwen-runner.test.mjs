@@ -30,6 +30,11 @@ if (args.includes("--version")) {
   process.stdout.write((process.env.FAKE_QWEN_VERSION || "0.21.0") + "\\n");
   process.exit(0);
 }
+const wallTime = Number(args[args.indexOf("--max-wall-time") + 1]?.replace(/s$/, ""));
+if (wallTime > 2147483) {
+  process.stderr.write("--max-wall-time exceeds Qwen's maximum supported budget\\n");
+  process.exit(1);
+}
 const mode = process.env.FAKE_QWEN_MODE || "normal";
 const validJson = ${JSON.stringify(VALID_JSON_RESULT)};
 function findTarget(root) {
@@ -51,6 +56,11 @@ const emit = (value) => process.stdout.write(JSON.stringify(value) + "\\n");
 const excludes = args[args.indexOf("--exclude-tools") + 1]?.split(",") || [];
 const tools = excludes.includes("read_file") ? [] : ["read_file"];
 if (mode === "unexpected-init-tool") tools.push("agent");
+if (mode === "qwen-024-tools" || mode === "qwen-024-ignore-tool-deny") {
+  for (const tool of ["tool_call", "manage_memory", "search_memory"]) {
+    if (mode === "qwen-024-ignore-tool-deny" || !excludes.includes(tool)) tools.push(tool);
+  }
+}
 if (mode === "qwen-022-report-findings" && !excludes.includes("report_findings")) {
   tools.push("report_findings");
 }
@@ -126,7 +136,7 @@ if (mode === "timeout-resume" && !resumed) {
     emit({ type: "assistant", session_id: session, message: { content: [{ type: "tool_use", id: "t1", name: "read_file", input: { file_path: target + ".other" } }] } });
     process.exit(0);
   }
-  if (mode === "read" || mode === "mutate") {
+  if (mode === "read" || mode === "mutate" || (mode === "qwen-024-tools" && tools.includes("read_file"))) {
     emit({ type: "assistant", session_id: session, message: { content: [{ type: "tool_use", id: "t1", name: "read_file", input: { file_path: target } }] } });
     emit({ type: "tool_result", session_id: session, tool_use_id: "t1" });
   }
@@ -234,6 +244,51 @@ test("qwen runner excludes the Qwen 0.22 report_findings UI tool", () => {
     assert.ok(excluded.includes("report_findings"));
   } finally {
     cleanupDir(run.dir);
+  }
+});
+
+for (const withTarget of [true, false]) {
+  test(`qwen runner excludes Qwen 0.24 bridge and memory tools (${withTarget ? "exact target" : "tool-free"})`, () => {
+    const run = runFake("qwen-024-tools", withTarget ? ["--target", "draft.md"] : []);
+    try {
+      assert.equal(run.result.status, 0, JSON.stringify(run.output));
+      assert.equal(run.output.status, "completed");
+      const args = JSON.parse(fs.readFileSync(run.argsFile, "utf8"));
+      const excluded = args[args.indexOf("--exclude-tools") + 1].split(",");
+      for (const tool of ["tool_call", "manage_memory", "search_memory"]) {
+        assert.ok(excluded.includes(tool), tool);
+      }
+      assert.equal(excluded.includes("read_file"), !withTarget);
+      assert.equal(fs.readFileSync(run.target, "utf8"), "unchanged\n");
+    } finally {
+      cleanupDir(run.dir);
+    }
+  });
+}
+
+test("qwen runner still rejects Qwen 0.24 tools when the CLI ignores exclusions", () => {
+  const run = runFake("qwen-024-ignore-tool-deny", ["--target", "draft.md"]);
+  try {
+    assert.equal(run.output.status, "failed");
+    assert.equal(run.output.errorCode, "tool_boundary_mismatch");
+    assert.equal(run.output.attempts.length, 1);
+    assert.equal(fs.readFileSync(run.target, "utf8"), "unchanged\n");
+  } finally {
+    cleanupDir(run.dir);
+  }
+});
+
+test("qwen runner caps the maximum Node timer at Qwen's supported whole seconds", () => {
+  for (const [milliseconds, seconds] of [[5001, 6], [2147483000, 2147483], [2147483001, 2147483], [2147483647, 2147483]]) {
+    const run = runFake("normal", [], { attemptTimeoutMs: milliseconds, timeoutMs: 2147483647 });
+    try {
+      assert.equal(run.result.status, 0, JSON.stringify(run.output));
+      assert.equal(run.output.status, "completed");
+      const args = JSON.parse(fs.readFileSync(run.argsFile, "utf8"));
+      assert.equal(args[args.indexOf("--max-wall-time") + 1], `${seconds}s`);
+    } finally {
+      cleanupDir(run.dir);
+    }
   }
 });
 

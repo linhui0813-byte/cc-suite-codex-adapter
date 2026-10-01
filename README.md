@@ -36,6 +36,10 @@ request, receives no files without explicit user authorization, and has no
 write-enabled mode. The runner uses Safe Mode, Plan mode, sandboxing, an empty
 MCP set, exact tool discovery, isolated file copies, bounded `read_file` calls,
 hash verification, and strict terminal-result validation.
+Qwen 0.24's generic tool bridge and memory tools are explicitly excluded;
+the advertised tool set must still be exactly `read_file` for file reviews
+or empty for tool-free reviews. At the longest supported timer, the CLI's
+whole-second budget is capped below Node's millisecond timer ceiling.
 Structured audit jobs additionally validate that the entire terminal result is
 one JSON object. Mixed prose is never extracted; the runner permits at most one
 tool-free same-session format restatement and fails closed if that is invalid.

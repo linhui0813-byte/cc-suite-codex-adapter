@@ -51,6 +51,8 @@ const EXIT_GRACE_MS = 10 * 1000;
 const SIGKILL_GRACE_MS = 5 * 1000;
 const MAX_RESUMES_LIMIT = 5;
 const MAX_TIMER_MS = 2_147_483_647;
+// Qwen accepts whole seconds up to floor(Node's millisecond timer ceiling).
+const MAX_QWEN_WALL_TIME_SECONDS = Math.floor(MAX_TIMER_MS / 1000);
 const RESULT_FORMATS = new Set(["text", "json-object"]);
 
 // Qwen 0.21.0 through 0.21.2 ignore --core-tools in Safe Mode. Deny every known
@@ -138,6 +140,9 @@ const QWEN_FORBIDDEN_TOOLS = [
   "computer_use__type_text",
   "computer_use__zoom",
   "report_findings",
+  "tool_call",
+  "manage_memory",
+  "search_memory",
 ];
 
 const ACTIVE_QWEN_CHILDREN = new Set();
@@ -353,7 +358,7 @@ function buildQwenArgs(args, targets, resumeId, prompt, attemptTimeoutMs) {
     "--approval-mode", "plan",
     "--output-format", "stream-json",
     "--include-partial-messages",
-    "--max-wall-time", `${Math.max(1, Math.ceil(attemptTimeoutMs / 1000))}s`,
+    "--max-wall-time", `${Math.min(MAX_QWEN_WALL_TIME_SECONDS, Math.max(1, Math.ceil(attemptTimeoutMs / 1000)))}s`,
     "--max-session-turns", "30",
     "--max-tool-calls", String(maxToolCalls),
     "--exclude-tools", excludedTools(targets).join(","),

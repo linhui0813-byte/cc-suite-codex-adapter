@@ -37,10 +37,13 @@ def transform_runtime(path: str, value: bytes) -> bytes:
 ];'''
         new_forbidden_tail = '''  "computer_use__zoom",
   "report_findings",
+  "tool_call",
+  "manage_memory",
+  "search_memory",
 ];'''
         if text.count(old_forbidden_tail) != 1:
             raise ValueError(
-                "upstream Qwen forbidden tool list changed; review the report_findings transform"
+                "upstream Qwen forbidden tool list changed; review the tool exclusion transform"
             )
         text = text.replace(old_forbidden_tail, new_forbidden_tail)
 
@@ -58,7 +61,7 @@ const DEFAULT_IDLE_TIMEOUT_MS = 8 * 60 * 1000;'''
     "--max-wall-time", `${Math.max(1, Math.ceil(attemptTimeoutMs / 1000))}s`,'''
         new_stream_args = '''    "--output-format", "stream-json",
     "--include-partial-messages",
-    "--max-wall-time", `${Math.max(1, Math.ceil(attemptTimeoutMs / 1000))}s`,'''
+    "--max-wall-time", `${Math.min(MAX_QWEN_WALL_TIME_SECONDS, Math.max(1, Math.ceil(attemptTimeoutMs / 1000)))}s`,'''
         if text.count(old_stream_args) != 1:
             raise ValueError("upstream Qwen stream arguments changed; review the runtime transform")
         text = text.replace(old_stream_args, new_stream_args)
@@ -77,6 +80,8 @@ const DEFAULT_IDLE_TIMEOUT_MS = 8 * 60 * 1000;'''
 // Qwen 0.21.0 through 0.21.2 ignore --core-tools in Safe Mode.'''
         new_limits = '''const MAX_RESUMES_LIMIT = 5;
 const MAX_TIMER_MS = 2_147_483_647;
+// Qwen accepts whole seconds up to floor(Node's millisecond timer ceiling).
+const MAX_QWEN_WALL_TIME_SECONDS = Math.floor(MAX_TIMER_MS / 1000);
 const RESULT_FORMATS = new Set(["text", "json-object"]);
 
 // Qwen 0.21.0 through 0.21.2 ignore --core-tools in Safe Mode.'''
