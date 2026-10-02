@@ -40,6 +40,9 @@ Qwen 0.24's generic tool bridge and memory tools are explicitly excluded;
 the advertised tool set must still be exactly `read_file` for file reviews
 or empty for tool-free reviews. At the longest supported timer, the CLI's
 whole-second budget is capped below Node's millisecond timer ceiling.
+The adapter supports both reviewed upstream preflight messages, including the
+wording that asks the user to run preflight. Unknown or repeated messages still
+stop the build for review.
 Structured audit jobs additionally validate that the entire terminal result is
 one JSON object. Mixed prose is never extracted; the runner permits at most one
 tool-free same-session format restatement and fails closed if that is invalid.
