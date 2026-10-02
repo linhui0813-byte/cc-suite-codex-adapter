@@ -11,6 +11,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "scripts"))
 
 from _lib import adapter_version, package_release, package_version, parse_head, tree_hash
+from build_plugin import transform_preflight_hint
 
 
 class AdapterTests(unittest.TestCase):
@@ -39,6 +40,23 @@ class AdapterTests(unittest.TestCase):
     def test_adapter_version_uses_codex_cachebuster(self) -> None:
         self.assertEqual(adapter_version("2.0.0", 7), "2.0.0+codex.adapter-7")
         self.assertEqual(adapter_version("2.0.0+build.1", 7), "2.0.0+build.1.codex.adapter-7")
+
+    def test_preflight_hint_accepts_reviewed_upstream_wordings(self) -> None:
+        for prefix in ("", "ask the user to "):
+            with self.subTest(prefix=prefix):
+                original = f"qwen not found on PATH — install Qwen Code, then {prefix}run /cc-suite:qwen-preflight"
+                expected = f"qwen not found on PATH — install Qwen Code, then {prefix}invoke $cc-suite-codex:qwen-preflight"
+                self.assertEqual(transform_preflight_hint(original), expected)
+
+    def test_preflight_hint_rejects_unreviewed_or_ambiguous_wordings(self) -> None:
+        legacy = "install Qwen Code, then run /cc-suite:qwen-preflight"
+        current = "install Qwen Code, then ask the user to run /cc-suite:qwen-preflight"
+        for text in ("", "install Qwen Code, then execute /cc-suite:qwen-preflight",
+                     legacy + "\n" + legacy, current + "\n" + current,
+                     legacy + "\n" + current):
+            with self.subTest(text=text):
+                with self.assertRaisesRegex(ValueError, "preflight hint changed"):
+                    transform_preflight_hint(text)
 
     def test_generated_tree_matches_lock(self) -> None:
         self.assertEqual(tree_hash(self.plugin), self.lock["artifact"]["tree_sha256"])

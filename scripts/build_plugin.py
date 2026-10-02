@@ -25,13 +25,25 @@ def sha256_bytes(value: bytes) -> str:
     return hashlib.sha256(value).hexdigest()
 
 
+def transform_preflight_hint(text: str) -> str:
+    reviewed_hints = {
+        "install Qwen Code, then run /cc-suite:qwen-preflight":
+            "install Qwen Code, then invoke $cc-suite-codex:qwen-preflight",
+        "install Qwen Code, then ask the user to run /cc-suite:qwen-preflight":
+            "install Qwen Code, then ask the user to invoke $cc-suite-codex:qwen-preflight",
+    }
+    if sum(text.count(hint) for hint in reviewed_hints) != 1:
+        raise ValueError("upstream Qwen preflight hint changed; review the runtime transform")
+    for hint, replacement in reviewed_hints.items():
+        if hint in text:
+            return text.replace(hint, replacement, 1)
+    raise AssertionError("reviewed preflight hint was not found")
+
+
 def transform_runtime(path: str, value: bytes) -> bytes:
     text = value.decode("utf-8")
     if path == "scripts/qwen-runner.mjs":
-        old = "install Qwen Code, then run /cc-suite:qwen-preflight"
-        if text.count(old) != 1:
-            raise ValueError("upstream Qwen preflight hint changed; review the runtime transform")
-        text = text.replace(old, "install Qwen Code, then invoke $cc-suite-codex:qwen-preflight")
+        text = transform_preflight_hint(text)
 
         old_forbidden_tail = '''  "computer_use__zoom",
 ];'''

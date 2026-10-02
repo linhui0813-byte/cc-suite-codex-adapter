@@ -1,8 +1,8 @@
 {
   "adapter_repository": "https://github.com/linhui0813-byte/cc-suite-codex-adapter",
-  "adapter_version": "2.0.0+codex.adapter-12",
-  "archive_sha256": "02d8afe73207e3a50641eacfadc5ce9afd3ed1bc33bfef778930f080e278c65b",
-  "commit": "9fe95167c2b2aeec8e734c75c99768bf0886dd00",
+  "adapter_version": "2.3.5+codex.adapter-13",
+  "archive_sha256": "96762b0488c0e6f820aee4dee422990d0fc0b2a0d0f981951942b0bc538936a7",
+  "commit": "c838fc46a0f5c16c4baeab8a7f68cab6eb096543",
   "plugin_name": "cc-suite-codex",
   "ref": "refs/heads/main",
   "runtime_files": [
@@ -44,11 +44,11 @@
     },
     {
       "origin": "deterministic-transform",
-      "packaged_sha256": "95de6d090af76d0cc4137b9713d78fa3e186d04f9c052b6775e26590b8fee7b4",
+      "packaged_sha256": "67c4153a6d6905df7fc3fc1b1009ddbdb3ce6a077910228eadaadd0184412663",
       "path": "scripts/qwen-runner.mjs",
-      "upstream_sha256": "78b72b4e9a3c53ae8e2c6bf73a42d23c0e6c255729235e6c9b0f35bffa06a8de"
+      "upstream_sha256": "d064f53cfc263544f7ebf1adb76e2b8a4ebf2f8260874aede67bb6a63e2d40ee"
     }
   ],
   "source": "https://github.com/xiaolai/cc-suite",
-  "version": "2.0.0"
+  "version": "2.3.5"
 }

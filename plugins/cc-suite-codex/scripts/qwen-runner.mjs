@@ -647,7 +647,7 @@ function executeQwenAttempt(cwd, args, targets, logFile, attempt, resumeId, prom
 
     child.on("error", (error) => {
       const message = error.code === "ENOENT"
-        ? "qwen not found on PATH — install Qwen Code, then invoke $cc-suite-codex:qwen-preflight"
+        ? "qwen not found on PATH — install Qwen Code, then ask the user to invoke $cc-suite-codex:qwen-preflight"
         : error.message;
       try {
         appendLog(logFile, `Attempt ${attempt}: spawn error: ${redactDiagnostic(message)}`);
