@@ -11,7 +11,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "scripts"))
 
 from _lib import adapter_version, package_release, package_version, parse_head, tree_hash
-from build_plugin import transform_preflight_hint
+from build_plugin import transform_preflight_hint, transform_runtime
 
 
 class AdapterTests(unittest.TestCase):
@@ -60,6 +60,34 @@ class AdapterTests(unittest.TestCase):
 
     def test_generated_tree_matches_lock(self) -> None:
         self.assertEqual(tree_hash(self.plugin), self.lock["artifact"]["tree_sha256"])
+
+    def test_stream_transform_accepts_reviewed_switch_variants(self) -> None:
+        current = (ROOT / "tests/fixtures/qwen-stream-v2.5.0.mjs").read_text()
+        start = current.index('    case "stream_event": {')
+        end = current.index('    default:', start)
+        legacy = current[:start] + current[end:]
+        outputs = []
+        for text in (legacy, current):
+            with self.subTest(variant="current" if text == current else "legacy"):
+                transformed = transform_runtime("scripts/lib/qwen-stream.mjs", text.encode()).decode()
+                self.assertEqual(transformed.count('    case "stream_event": {'), 1)
+                self.assertIn('validatePassiveStreamEvent(state, event);', transformed)
+                self.assertIn('"stream_event_before_init"', transformed)
+                self.assertIn('"event_after_result"', transformed)
+                self.assertNotIn('if (innerType === "goal_state") return;', transformed)
+                outputs.append(transformed)
+        self.assertEqual(outputs[0], outputs[1])
+
+    def test_stream_transform_rejects_changed_or_repeated_switches(self) -> None:
+        current = (ROOT / "tests/fixtures/qwen-stream-v2.5.0.mjs").read_text()
+        for text in (
+            current.replace('if (innerType === "goal_state") return;', 'if (innerType) return;'),
+            current.replace('    case "result":', '    case "future_result":'),
+            current + current,
+        ):
+            with self.subTest(text=text):
+                with self.assertRaisesRegex(ValueError, "upstream Qwen stream"):
+                    transform_runtime("scripts/lib/qwen-stream.mjs", text.encode())
 
     def test_only_qwen_runtime_is_packaged(self) -> None:
         for name in ("commands", "hooks", "agents"):

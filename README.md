@@ -43,6 +43,10 @@ whole-second budget is capped below Node's millisecond timer ceiling.
 The adapter supports both reviewed upstream preflight messages, including the
 wording that asks the user to run preflight. Unknown or repeated messages still
 stop the build for review.
+The stream transform also recognizes the reviewed upstream 2.5.0 goal-state
+handler and replaces it with the adapter's validated partial-progress handler.
+Both reviewed upstream layouts produce one handler; unknown layouts still
+stop the build for review.
 Structured audit jobs additionally validate that the entire terminal result is
 one JSON object. Mixed prose is never extracted; the runner permits at most one
 tool-free same-session format restatement and fails closed if that is invalid.
