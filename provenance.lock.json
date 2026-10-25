@@ -1,7 +1,7 @@
 {
   "adapter": {
     "repository": "https://github.com/linhui0813-byte/cc-suite-codex-adapter",
-    "revision": 13,
+    "revision": 14,
     "runtime_files": [
       "scripts/lib/delegation-boundary.mjs",
       "scripts/lib/process.mjs",
@@ -20,22 +20,22 @@
       "qwen-review",
       "repair"
     ],
-    "sync_time": "2026-10-02T09:12:29Z",
-    "version": "2.3.5+codex.adapter-13"
+    "sync_time": "2026-10-25T03:00:45Z",
+    "version": "2.5.0+codex.adapter-14"
   },
   "artifact": {
     "plugin_path": "plugins/cc-suite-codex",
-    "tree_sha256": "7373f3a29df421110c25b615763cbb968d5d6a82bbd04a54a0d6b5eedff4433c"
+    "tree_sha256": "84404931ab3b91bdc7620187688fb9491808d771ea2e7e3302910ceb0f440912"
   },
   "schema_version": 2,
   "upstream": {
-    "archive_sha256": "96762b0488c0e6f820aee4dee422990d0fc0b2a0d0f981951942b0bc538936a7",
-    "archive_url": "https://github.com/xiaolai/cc-suite/archive/c838fc46a0f5c16c4baeab8a7f68cab6eb096543.tar.gz",
-    "commit": "c838fc46a0f5c16c4baeab8a7f68cab6eb096543",
+    "archive_sha256": "16dd122c9541c07796447fada2fdfa91c56f854e29be9be4ac0ad27ee9176493",
+    "archive_url": "https://github.com/xiaolai/cc-suite/archive/a0e97ad076b66a114bd6eb12f1a6486a38ff51dc.tar.gz",
+    "commit": "a0e97ad076b66a114bd6eb12f1a6486a38ff51dc",
     "license_sha256": "87b3f4064cb76d1c7cc8c39546d7d62790b76372f37cfb9de1bb828a5f652b51",
     "package_path": "package.json",
     "ref": "refs/heads/main",
     "repository": "https://github.com/xiaolai/cc-suite",
-    "version": "2.3.5"
+    "version": "2.5.0"
   }
 }

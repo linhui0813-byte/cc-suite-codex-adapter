@@ -637,6 +637,27 @@ export function consumeQwenEvent(state, event) {'''
       inspectResult(state, event);
       return;
     default:'''
+        reviewed_goal_state_switch = '''    case "result":
+      inspectResult(state, event);
+      return;
+    case "stream_event": {
+      // qwen-code 0.24.x wraps internal state notices in a stream_event
+      // envelope: {"type":"stream_event","event":{"type":"goal_state",...}}.
+      // Only the known-inert goal_state subtype is accepted. Every other
+      // subtype -- including a missing or non-object inner event -- still
+      // throws, so an envelope carrying tool activity fails closed rather than
+      // being silently ignored. Widen this list only for a subtype proven
+      // incapable of carrying a tool call; the whole point of the observer is
+      // that an event it does not understand stops the run.
+      const inner = event.event;
+      const innerType = inner && typeof inner === "object" ? inner.type : null;
+      if (innerType === "goal_state") return;
+      throw new QwenStreamError(
+        "unknown_event",
+        `Qwen emitted unsupported stream_event subtype: ${innerType ?? "(missing)"}`
+      );
+    }
+    default:'''
         new_switch = '''    case "stream_event": {
       if (!state.initSeen) {
         throw new QwenStreamError(
@@ -651,9 +672,13 @@ export function consumeQwenEvent(state, event) {'''
       inspectResult(state, event);
       return;
     default:'''
-        if text.count(old_switch) != 1:
+        reviewed_switches = (old_switch, reviewed_goal_state_switch)
+        if sum(text.count(switch) for switch in reviewed_switches) != 1:
             raise ValueError("upstream Qwen stream switch changed; review the runtime transform")
-        text = text.replace(old_switch, new_switch)
+        for switch in reviewed_switches:
+            if switch in text:
+                text = text.replace(switch, new_switch, 1)
+                break
 
         old_description = '''export function describeQwenEvent(event) {
   if (event.type === "system") return `event system/${event.subtype ?? "unknown"}`;'''

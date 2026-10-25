@@ -60,6 +60,10 @@ const RESULT_FORMATS = new Set(["text", "json-object"]);
 // accepting any later stream event. A future unlisted tool therefore fails the
 // init check.
 const QWEN_FORBIDDEN_TOOLS = [
+  // Internal tools 0.24.x advertises in the Plan-mode init event. They must be
+  // excluded for the exact-empty boundary check to pass on that version.
+  "report_findings",
+  "tool_call",
   "edit",
   "write_file",
   "grep_search",
